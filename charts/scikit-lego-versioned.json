@@ -4534,8 +4534,7 @@
       },
       "mark": {
         "type": "area"
-      },
-      "title": "Code Archaeology: Lines of Code by Period Added"
+      }
     },
     {
       "data": {
@@ -4592,5 +4591,6 @@
       }
     }
   ],
+  "title": "Code Archaeology: Lines of Code by Period Added",
   "width": 800
 }
