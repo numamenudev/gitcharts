@@ -12,13 +12,14 @@
 
 import marimo
 
-__generated_with = "0.18.4"
+__generated_with = "0.20.4"
 app = marimo.App(width="medium")
 
 
 @app.cell
 def _():
     import marimo as mo
+
     return (mo,)
 
 
@@ -62,37 +63,34 @@ def _():
 
 @app.cell
 def _(mo):
-    repo_url_input = mo.ui.text(
-        value="https://github.com/marimo-team/marimo",
-        label="Repository URL (HTTPS)",
-        full_width=True,
-    )
-    repo_url_input
-    return (repo_url_input,)
+    params_form = mo.md("""
+    {repo_url}
 
+    {file_extensions}
 
-@app.cell
-def _(mo):
-    sample_count_slider = mo.ui.slider(
-        start=10,
-        stop=200,
-        value=100,
-        step=5,
-        label="Number of commits to sample",
-    )
-    sample_count_slider
-    return (sample_count_slider,)
+    {sample_count}
+    """).batch(
+        repo_url=mo.ui.text(
+            value="https://github.com/marimo-team/marimo",
+            label="Repository URL (HTTPS)",
+            full_width=True,
+        ),
+        file_extensions=mo.ui.text(
+            value=".py,.js,.ts,.java,.c,.cpp,.h,.go,.rs,.rb,.md",
+            label="File extensions to analyze (comma-separated, leave empty for all)",
+            full_width=True,
+        ),
+        sample_count=mo.ui.slider(
+            start=10,
+            stop=200,
+            value=100,
+            step=5,
+            label="Number of commits to sample",
+        ),
+    ).form()
 
-
-@app.cell
-def _(mo):
-    file_extensions_input = mo.ui.text(
-        value=".py,.js,.ts,.java,.c,.cpp,.h,.go,.rs,.rb,.md",
-        label="File extensions to analyze (comma-separated, leave empty for all)",
-        full_width=True,
-    )
-    file_extensions_input
-    return (file_extensions_input,)
+    params_form
+    return (params_form,)
 
 
 @app.cell
@@ -121,12 +119,13 @@ def _():
     class RepoParams(BaseModel):
         repo: str = Field(description="Repository URL (HTTPS)")
         samples: int = Field(default=100, description="Number of commits to sample")
+        file_extensions: str = Field(default=".py,.js,.ts,.java,.c,.cpp,.h,.go,.rs,.rb,.md", description="Comma-separated file extensions to analyze")
 
-    return (RepoParams,)
+    return PydanticUndefined, RepoParams
 
 
 @app.cell
-def _(RepoParams, mo):
+def _(PydanticUndefined, RepoParams, mo):
     cli_args = mo.cli_args()
 
     if mo.app_meta().mode == "script":
@@ -140,7 +139,7 @@ def _(RepoParams, mo):
         repo_params = RepoParams(
             **{k.replace("-", "_"): v for k, v in cli_args.items()}
         )
-    return cli_args, repo_params
+    return (repo_params,)
 
 
 @app.cell(hide_code=True)
@@ -178,6 +177,7 @@ def _(subprocess):
                 check=True,
             )
         return repo_path
+
     return Path, clone_or_update_repo
 
 
@@ -342,28 +342,30 @@ def _(cache, datetime, subprocess):
                 raw_data.extend(future.result())
 
         return raw_data
+
     return collect_blame_data, get_commit_list, sample_commits
 
 
 @app.cell
 def _(
     clone_or_update_repo,
-    file_extensions_input,
     get_commit_list,
     mo,
+    params_form,
     repo_params,
-    repo_url_input,
     sample_commits,
-    sample_count_slider,
 ):
+    mo.stop(mo.app_meta().mode != "script" and params_form.value is None, mo.md("Fill in the form above and click **Submit** to start."))
+
     # Clone or use cached repo
-    repo_url = repo_params.repo if mo.app_meta().mode == "script" else repo_url_input.value.strip()
+    repo_url = repo_params.repo if mo.app_meta().mode == "script" else params_form.value["repo_url"].strip()
     with mo.status.spinner(f"Cloning/updating repository..."):
         repo_path = clone_or_update_repo(repo_url)
 
     # Parse configuration
-    n_samples = repo_params.samples if mo.app_meta().mode == "script" else sample_count_slider.value
-    extensions_str = file_extensions_input.value.strip()
+    n_samples = repo_params.samples if mo.app_meta().mode == "script" else params_form.value["sample_count"]
+    extensions_str = repo_params.file_extensions if mo.app_meta().mode == "script" else params_form.value["file_extensions"]
+    extensions_str = extensions_str.strip()
     extensions = [ext.strip() for ext in extensions_str.split(",")] if extensions_str else None
 
     # Get commits
@@ -428,10 +430,10 @@ def _(datetime, granularity_select, pl, raw_df):
 
 
 @app.cell
-def _(mo, repo_params, repo_url_input):
+def _(mo, params_form, repo_params):
     import httpx
 
-    _repo = repo_params.repo if mo.app_meta().mode == "script" else repo_url_input.value
+    _repo = repo_params.repo if mo.app_meta().mode == "script" else params_form.value["repo_url"]
     parts = _repo.split("/")
     repo_name = parts[-2] if _repo.endswith("/") else parts[-1]
 
