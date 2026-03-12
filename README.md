@@ -48,3 +48,7 @@ uv run python -m http.server
 ```
 
 Then open [http://localhost:8000](http://localhost:8000) in your browser.
+
+## More ambitous? 
+
+This project was intended for Python projects but the idea is catching on and some folks have started porting this idea to Rust for better performance. If you're keen to explore that, check out https://github.com/czechbol/strata. 
