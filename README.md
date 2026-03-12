@@ -10,7 +10,7 @@ With charts like this you get an idea of how quickly code is rewritten in a repo
 
 [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/koaning/gitcharts/blob/main/git_archaeology.py)
 
-You can download `git_archaeology.py` locally to run it, but you can also run it in molab without downloading anything. The marimo notebook contains all dependencies so can just run: 
+You can download `git_archaeology.py` locally to run it, but you can also run it in molab without downloading anything. The marimo notebook contains all dependencies so can just run `marimo edit` to edit the notebook locally: 
 
 ```
 uvx marimo edit git_archaeology.py
