@@ -72,14 +72,14 @@ def _(mo):
             full_width=True,
         ),
         file_extensions=mo.ui.text(
-            value=".py,.js,.ts,.java,.c,.cpp,.h,.go,.rs,.rb,.md",
+            value=".py,.js,.ts,.java,.c,.cpp,.h,.go,.rs,.rb,.md,.pyx,.cu,.rst",
             label="File extensions to analyze (comma-separated, leave empty for all)",
             full_width=True,
         ),
         sample_count=mo.ui.slider(
             start=10,
             stop=200,
-            value=100,
+            value=200,
             step=5,
             label="Number of commits to sample",
         ),
@@ -120,8 +120,8 @@ def _():
 
     class RepoParams(BaseModel):
         repo: str = Field(description="Repository URL (HTTPS)")
-        samples: int = Field(default=100, description="Number of commits to sample")
-        file_extensions: str = Field(default=".py,.js,.ts,.java,.c,.cpp,.h,.go,.rs,.rb,.md", description="Comma-separated file extensions to analyze")
+        samples: int = Field(default=200, description="Number of commits to sample")
+        file_extensions: str = Field(default=".py,.js,.ts,.java,.c,.cpp,.h,.go,.rs,.rb,.md,.pyx,.cu,.rst", description="Comma-separated file extensions to analyze")
         version_source: str = Field(default="git tags", description="Version source: none, git tags, or pypi")
 
     return PydanticUndefined, RepoParams
