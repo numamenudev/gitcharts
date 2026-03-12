@@ -106,9 +106,9 @@ def _(mo):
 
 
 @app.cell
-def _(mo):
+def _(has_pypi, mo):
     show_versions = mo.ui.checkbox(label="show versions")
-    show_versions
+    mo.output.replace(show_versions if has_pypi else None)
     return (show_versions,)
 
 
