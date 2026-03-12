@@ -532,16 +532,17 @@ def _(Path, alt, chart, date_lines, date_text, out, repo_name):
     clean_path.write_text(out.to_json())
 
     versioned_path = Path("charts") / (repo_name + "-versioned.json")
-    versioned_chart = (
-        (chart + date_lines + date_text)
-        .properties(
-            title="Code Archaeology: Lines of Code by Period Added",
-            width=800,
-            height=500,
+    if date_lines is not None:
+        versioned_chart = (
+            (chart + date_lines + date_text)
+            .properties(
+                title="Code Archaeology: Lines of Code by Period Added",
+                width=800,
+                height=500,
+            )
+            .to_dict()
         )
-        .to_dict()
-    )
-    versioned_path.write_text(alt.Chart.from_dict(versioned_chart).to_json())
+        versioned_path.write_text(alt.Chart.from_dict(versioned_chart).to_json())
     return
 
 
