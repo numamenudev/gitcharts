@@ -361,6 +361,9 @@ def _(
 
     # Clone or use cached repo
     repo_url = repo_params.repo if mo.app_meta().mode == "script" else params_form.value["repo_url"].strip()
+    # Accept short GitHub references like "koaning/scikit-lego"
+    if "/" in repo_url and not repo_url.startswith(("http://", "https://", "git@")):
+        repo_url = f"https://github.com/{repo_url}"
     with mo.status.spinner(f"Cloning/updating repository..."):
         repo_path = clone_or_update_repo(repo_url)
 
