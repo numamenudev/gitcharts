@@ -42,7 +42,7 @@ This runs `generate_repos_list.py` to create `charts/repos.json` from the availa
 Due to browser security restrictions, you cannot open `index.html` directly from the filesystem. Instead, start a local HTTP server:
 
 ```bash
-python -m http.server
+uv run python -m http.server
 ```
 
 Then open [http://localhost:8000](http://localhost:8000) in your browser.
