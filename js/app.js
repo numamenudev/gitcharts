@@ -259,11 +259,21 @@ async function loadRepos() {
     if (!response.ok) {
       throw new Error(`Failed to load repos: ${response.status}`);
     }
-    return await response.json();
+    const data = await response.json();
+
+    // Handle legacy array format: ["repo1", "repo2"]
+    if (Array.isArray(data)) {
+      const obj = {};
+      data.forEach((repo) => {
+        obj[repo] = ["clean", "versioned"];
+      });
+      return obj;
+    }
+
+    return data;
   } catch (error) {
     console.error("Error loading repos:", error);
-    // Fallback to empty array
-    return [];
+    return {};
   }
 }
 
