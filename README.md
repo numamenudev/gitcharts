@@ -28,3 +28,21 @@ uv run git_archaeology.py --repo https://github.com/marimo-team/marimo --samples
 
 - `--repo` (required) — Repository URL (HTTPS)
 - `--samples` (optional, default: 100) — Number of commits to sample
+
+After generating charts, run `make build` to update the repository index:
+
+```bash
+make build
+```
+
+This runs `generate_repos_list.py` to create `charts/repos.json` from the available chart files.
+
+## Viewing Charts Locally
+
+Due to browser security restrictions, you cannot open `index.html` directly from the filesystem. Instead, start a local HTTP server:
+
+```bash
+python -m http.server
+```
+
+Then open [http://localhost:8000](http://localhost:8000) in your browser.
