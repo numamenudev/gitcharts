@@ -7,6 +7,7 @@
 #     "httpx==0.28.1",
 #     "pydantic>=2.0.0",
 #     "diskcache==5.6.3",
+#     "tenacity>=8.0.0",
 # ]
 # ///
 
@@ -432,36 +433,60 @@ def _(datetime, granularity_select, pl, raw_df):
 @app.cell
 def _(mo, params_form, repo_params):
     import httpx
+    import sys
+    from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException)),
+    )
+    def fetch_pypi_info(package_name):
+        return httpx.get(f"https://pypi.org/pypi/{package_name}/json")
 
     _repo = repo_params.repo if mo.app_meta().mode == "script" else params_form.value["repo_url"]
     parts = _repo.split("/")
     repo_name = parts[-2] if _repo.endswith("/") else parts[-1]
 
-    res = httpx.get(f"https://pypi.org/pypi/{repo_name}/json").json()
-    return repo_name, res
+    try:
+        response = fetch_pypi_info(repo_name)
+        has_pypi = response.status_code == 200
+        res = response.json() if has_pypi else {}
+    except Exception:
+        has_pypi = False
+        res = {}
+
+    if not has_pypi:
+        msg = f"Could not find '{repo_name}' on PyPI — version overlay will be unavailable."
+        print(f"Warning: {msg}", file=sys.stderr)
+    return has_pypi, repo_name, res
 
 
 @app.cell
-def _(alt, pl, res):
+def _(alt, has_pypi, pl, res):
     _version_data = [
         {"version": key, "datetime": value[0]["upload_time"]}
-        for key, value in res["releases"].items()
+        for key, value in res.get("releases", {}).items()
         if key.endswith(".0") and key != "0.0.0" and len(value) > 0
     ]
     df_versions = pl.DataFrame(
         _version_data,
         schema={"version": pl.Utf8, "datetime": pl.Utf8},
-    ).with_columns(datetime=pl.col("datetime").str.to_datetime())
-
-    base_chart = alt.Chart(df_versions)
-
-    date_lines = base_chart.mark_rule(strokeDash=[5, 5]).encode(
-        x=alt.X("datetime:T", title="Date"), tooltip=["version:N", "datetime:T"]
     )
 
-    date_text = base_chart.mark_text(angle=270, align="left", dx=15, dy=0).encode(
-        x="datetime:T", y=alt.value(10), text="version:N"
-    )
+    date_lines = None
+    date_text = None
+    if has_pypi and len(df_versions) > 0:
+        df_versions = df_versions.with_columns(datetime=pl.col("datetime").str.to_datetime())
+        base_chart = alt.Chart(df_versions)
+
+        date_lines = base_chart.mark_rule(strokeDash=[5, 5]).encode(
+            x=alt.X("datetime:T", title="Date"), tooltip=["version:N", "datetime:T"]
+        )
+
+        date_text = base_chart.mark_text(angle=270, align="left", dx=15, dy=0).encode(
+            x="datetime:T", y=alt.value(10), text="version:N"
+        )
     return date_lines, date_text
 
 
@@ -486,7 +511,7 @@ def _(alt, date_lines, date_text, df, granularity_select, show_versions):
     )
 
     out = chart
-    if show_versions.value:
+    if show_versions.value and date_lines is not None:
         out += date_lines + date_text
 
     out = out.properties(
