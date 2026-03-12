@@ -1,6 +1,6 @@
 // Application State
 const state = {
-  repos: [], // Will be loaded from repos.json
+  repos: {}, // Will be loaded from repos.json: {name: [variants]}
   currentRepo: null,
   currentVariant: "clean",
   loadedCharts: {}, // Cache: {repo-variant: vegaSpec}
@@ -10,6 +10,7 @@ const state = {
 let repoSelect;
 let cleanRadio;
 let versionedRadio;
+let variantToggle;
 let chartContainer;
 
 // ========================================
@@ -21,9 +22,14 @@ let chartContainer;
  * Format: #repo-name/variant
  * Example: #human-learn/versioned
  */
+function repoNames() {
+  return Object.keys(state.repos);
+}
+
 function parseURL() {
   const hash = window.location.hash.slice(1); // Remove the '#'
-  const defaultRepo = state.repos[0] || "scikit-lego";
+  const names = repoNames();
+  const defaultRepo = names[0] || "scikit-lego";
 
   if (!hash) {
     return {
@@ -37,12 +43,11 @@ function parseURL() {
   const variant = parts[1] || "clean";
 
   // Validate repo exists in loaded repos
-  const validRepo = state.repos.includes(repo) ? repo : defaultRepo;
+  const validRepo = names.includes(repo) ? repo : defaultRepo;
 
-  // Validate variant is clean or versioned
-  const validVariant = ["clean", "versioned"].includes(variant)
-    ? variant
-    : "clean";
+  // Validate variant is available for this repo
+  const availableVariants = state.repos[validRepo] || ["clean"];
+  const validVariant = availableVariants.includes(variant) ? variant : "clean";
 
   return {
     repo: validRepo,
@@ -182,6 +187,16 @@ function updateDropdown() {
  * Update toggle selection
  */
 function updateToggle() {
+  const variants = state.repos[state.currentRepo] || ["clean"];
+  const hasVersioned = variants.includes("versioned");
+
+  variantToggle.style.display = hasVersioned ? "" : "none";
+
+  if (!hasVersioned && state.currentVariant === "versioned") {
+    state.currentVariant = "clean";
+    updateURL();
+  }
+
   if (state.currentVariant === "clean") {
     cleanRadio.checked = true;
   } else {
@@ -206,6 +221,7 @@ function updateUI() {
  */
 function onRepoChange(event) {
   state.currentRepo = event.target.value;
+  updateToggle();
   updateURL();
   updateChart();
 }
@@ -257,7 +273,7 @@ async function loadRepos() {
 function populateDropdown() {
   repoSelect.innerHTML = "";
 
-  state.repos.forEach((repo) => {
+  repoNames().forEach((repo) => {
     const option = document.createElement("option");
     option.value = repo;
     option.textContent = repo;
@@ -273,6 +289,7 @@ async function init() {
   repoSelect = document.getElementById("repo-select");
   cleanRadio = document.getElementById("clean");
   versionedRadio = document.getElementById("versioned");
+  variantToggle = versionedRadio.closest(".btn-group");
   chartContainer = document.getElementById("chart-container");
 
   // Load repositories list
