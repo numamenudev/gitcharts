@@ -57,11 +57,6 @@ def _(mo):
 
 
 @app.cell
-def _():
-    return
-
-
-@app.cell
 def _(mo):
     params_form = mo.md("""
     {repo_url}
@@ -107,8 +102,9 @@ def _(mo):
 @app.cell
 def _(mo):
     show_versions = mo.ui.checkbox(label="show versions")
-    show_versions
-    return (show_versions,)
+    invert_layers = mo.ui.checkbox(label="invert layers")
+    mo.hstack([show_versions, invert_layers])
+    return invert_layers, show_versions
 
 
 @app.cell
@@ -467,8 +463,17 @@ def _(alt, pl, res):
 
 
 @app.cell
-def _(alt, date_lines, date_text, df, granularity_select, show_versions):
+def _(
+    alt,
+    date_lines,
+    date_text,
+    df,
+    granularity_select,
+    invert_layers,
+    show_versions,
+):
     color_title = "Year Added" if granularity_select.value == "Year" else "Quarter Added"
+    sort_order = "descending" if invert_layers.value else "ascending"
 
     chart = (
         alt.Chart(df)
@@ -481,7 +486,7 @@ def _(alt, date_lines, date_text, df, granularity_select, show_versions):
                 scale=alt.Scale(scheme="viridis"),
                 title=color_title,
             ),
-            order=alt.Order("period:O"),
+            order=alt.Order("period:O", sort=sort_order),
             tooltip=["commit_date:T", "period:O", "line_count:Q"],
         )
     )
