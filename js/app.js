@@ -260,19 +260,27 @@ function mergeWithDevelop(mainSpec, devSpec) {
   const devDelta = devData.filter(d => d.commit_date > lastMainDate);
   if (devDelta.length === 0) return main;
 
-  // Dev delta layer — same viridis scheme + field as main, distinguished by opacity
+  // Rename period → dev_period so Vega-Lite creates a separate legend
+  const devDeltaRenamed = devDelta.map(d => ({
+    commit_date: d.commit_date,
+    line_count: d.line_count,
+    dev_period: d.period,
+  }));
+
+  // Dev delta layer — viridis with reduced opacity + separate legend
   const devLayer = {
-    data: { values: devDelta },
+    data: { values: devDeltaRenamed },
     mark: { type: "area", opacity: 0.4 },
     encoding: {
       x: { field: "commit_date", type: "temporal" },
       y: { field: "line_count", type: "quantitative" },
       color: {
-        field: "period",
+        field: "dev_period",
         type: "ordinal",
         scale: { scheme: "viridis" },
+        legend: { title: "Dev Period", symbolOpacity: 0.4 },
       },
-      order: { field: "period", sort: "ascending" },
+      order: { field: "dev_period", sort: "ascending" },
     },
   };
 
@@ -326,6 +334,7 @@ function mergeWithDevelop(mainSpec, devSpec) {
     width: main.width,
     height: main.height,
     layer: layers,
+    resolve: { scale: { color: "independent" }, legend: { color: "independent" } },
   };
 }
 
