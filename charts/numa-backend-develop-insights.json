@@ -34,9 +34,9 @@
     },
     {
       "path": "Valence_ext",
-      "total_changes": 12,
-      "file_count": 12,
-      "reason": "12 files, 12 total changes (avg 1.0/file) — stable, rarely modified code."
+      "total_changes": 21,
+      "file_count": 17,
+      "reason": "17 files, 21 total changes (avg 1.2/file) — stable, rarely modified code."
     },
     {
       "path": "docs",
@@ -50,7 +50,7 @@
     "Add comprehensive tests for 'numa-backend/Extensions/ServiceCollectionExtensions.cs' — it changes frequently (55 times) and a regression here could have wide impact.",
     "Prioritize code review for 'numa-backend/Extensions/ServiceCollectionExtensions.cs' and 'numa-backend/Program.cs' — they carry the highest risk scores and are the most likely sources of future bugs."
   ],
-  "total_files": 1015,
-  "total_changes": 3004,
+  "total_files": 1022,
+  "total_changes": 3019,
   "repo": "numa-backend-develop"
 }

@@ -1,8 +1,10 @@
 """GitCharts server with regeneration API."""
 
 import json
+import re
 import subprocess
 import threading
+import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
@@ -11,11 +13,83 @@ SCRIPT_PATH = Path("git_archaeology.py")
 HOTSPOT_SCRIPT_PATH = Path("hotspot_analysis.py")
 
 # Track regeneration status
-status = {"running": False, "repo": None, "progress": "", "error": None}
+status = {
+    "running": False, "repo": None, "progress": "", "error": None,
+    "detail": None,  # {stage, label, current, total, elapsed, eta, global_pct}
+    "cancelled": False,
+}
+
+# Global references for cancel support + progress aggregation
+_current_proc = None
+_global_plan = {
+    "total_weight": 0,
+    "done_weight": 0,
+    "current_stage_weight": 0,
+    "started_at": 0,
+}
+
+PROGRESS_RE = re.compile(r"^PROGRESS: (\d+)/(\d+) ?(.*)$")
+STAGE_RE = re.compile(r"^STAGE: (\S+) weight=(\d+)$")
 
 
-def run_hotspot(repo_name, config, branch="", save_as=""):
-    """Run hotspot_analysis.py for a single repo/branch. Non-fatal on failure."""
+def _recompute_global(current_in_stage, total_in_stage):
+    """Return global pct (0-100) based on plan state."""
+    plan = _global_plan
+    if plan["total_weight"] <= 0:
+        return 0.0
+    stage_frac = (current_in_stage / total_in_stage) if total_in_stage > 0 else 0
+    done = plan["done_weight"] + stage_frac * plan["current_stage_weight"]
+    return max(0.0, min(100.0, (done / plan["total_weight"]) * 100))
+
+
+def _stream_with_progress(proc, stage_label):
+    """Read proc.stdout line-by-line, parse STAGE/PROGRESS and update status."""
+    for raw in proc.stdout:
+        if status.get("cancelled"):
+            try: proc.terminate()
+            except Exception: pass
+            break
+        line = raw.rstrip("\r\n")
+        ms = STAGE_RE.match(line)
+        if ms:
+            # Advance plan: finish current stage, start a new one
+            _global_plan["done_weight"] += _global_plan["current_stage_weight"]
+            _global_plan["current_stage_weight"] = int(ms.group(2))
+            status["detail"] = {
+                "stage": stage_label,
+                "label": f"starting {ms.group(1)}",
+                "current": 0, "total": 1,
+                "elapsed": round(time.time() - _global_plan["started_at"], 1),
+                "eta": None,
+                "global_pct": round(_recompute_global(0, 1), 1),
+            }
+            continue
+        mp = PROGRESS_RE.match(line)
+        if mp:
+            current = int(mp.group(1))
+            total = int(mp.group(2))
+            label = mp.group(3).strip()
+            elapsed = time.time() - _global_plan["started_at"]
+            gpct = _recompute_global(current, total)
+            # Global ETA based on elapsed vs global completion
+            frac = gpct / 100
+            eta = (elapsed / frac * (1 - frac)) if frac > 0.01 else None
+            status["detail"] = {
+                "stage": stage_label,
+                "label": label,
+                "current": current, "total": total,
+                "elapsed": round(elapsed, 1),
+                "eta": round(eta, 1) if eta is not None else None,
+                "global_pct": round(gpct, 1),
+            }
+    proc.wait()
+    # Finalize: assume the last stage of this subprocess is done
+    _global_plan["done_weight"] += _global_plan["current_stage_weight"]
+    _global_plan["current_stage_weight"] = 0
+
+
+def run_hotspot(repo_name, config, branch="", save_as="", path_prefix="", timeline=0, timeline_granularity="snapshot"):
+    """Run hotspot_analysis.py for a single repo/branch. Streams progress."""
     cmd = [
         "uv", "run", str(HOTSPOT_SCRIPT_PATH),
         "--repo", config["url"],
@@ -25,11 +99,29 @@ def run_hotspot(repo_name, config, branch="", save_as=""):
         cmd += ["--branch", branch]
         if save_as and save_as != branch:
             cmd += ["--branch-label", save_as]
-    subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    if path_prefix:
+        cmd += ["--path-prefix", path_prefix]
+    if timeline and timeline > 0:
+        cmd += ["--timeline", str(timeline)]
+    if timeline_granularity and timeline_granularity != "snapshot":
+        cmd += ["--timeline-granularity", timeline_granularity]
+
+    global _current_proc
+    stage_label = f"hotspot {branch or 'main'}" + (f" @ {path_prefix}" if path_prefix else "")
+    proc = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, bufsize=1,
+    )
+    _current_proc = proc
+    try:
+        _stream_with_progress(proc, stage_label)
+    finally:
+        _current_proc = None
 
 
 def regenerate_repo(repo_name, config, granularity, branch="", save_as=""):
-    """Run git_archaeology.py for a single repo/branch."""
+    """Run git_archaeology.py for a single repo/branch. Cancellable."""
+    global _current_proc
     cmd = [
         "uv", "run", str(SCRIPT_PATH),
         "--repo", config["url"],
@@ -41,9 +133,24 @@ def regenerate_repo(repo_name, config, granularity, branch="", save_as=""):
         cmd += ["--branch", branch]
         if save_as and save_as != branch:
             cmd += ["--branch-label", save_as]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr or result.stdout)
+    # Treat whole archaeology run as a single coarse stage
+    _global_plan["done_weight"] += _global_plan["current_stage_weight"]
+    _global_plan["current_stage_weight"] = 15
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    _current_proc = proc
+    try:
+        for _ in proc.stdout:
+            if status.get("cancelled"):
+                try: proc.terminate()
+                except Exception: pass
+                break
+        proc.wait()
+    finally:
+        _current_proc = None
+    _global_plan["done_weight"] += _global_plan["current_stage_weight"]
+    _global_plan["current_stage_weight"] = 0
+    if proc.returncode != 0 and not status.get("cancelled"):
+        raise RuntimeError(f"archaeology exited {proc.returncode}")
 
 
 def get_develop_branch(config):
@@ -64,10 +171,25 @@ def get_develop_branch(config):
     return None
 
 
-def regenerate_single(repo_name, granularity):
+def regenerate_single(repo_name, granularity, path_prefix="", timeline=0, skip_archaeology=False, timeline_granularity="snapshot"):
     """Regenerate a single repo (main + develop if exists) in background."""
     global status
-    status = {"running": True, "repo": repo_name, "progress": "", "error": None}
+    status = {
+        "running": True, "repo": repo_name, "progress": "", "error": None,
+        "detail": None, "cancelled": False,
+    }
+
+    # Initialize plan. We don't know upfront if develop exists, so conservative:
+    # main + maybe develop × (archaeology + hotspot[+timeline])
+    # Each branch: archaeology=15 + snapshot=5 + (timeline*3 if timeline)
+    # We guess develop exists; if not, weights still work out since we finalize per-stage.
+    per_branch = (15 if not (skip_archaeology or path_prefix) else 0) + 5
+    if timeline and timeline > 0:
+        per_branch += timeline * 3
+    _global_plan["total_weight"] = per_branch * 2  # assume dev exists; tighten later
+    _global_plan["done_weight"] = 0
+    _global_plan["current_stage_weight"] = 0
+    _global_plan["started_at"] = time.time()
 
     try:
         with open(CONFIG_PATH) as f:
@@ -78,17 +200,27 @@ def regenerate_single(repo_name, granularity):
 
         config = repos[repo_name]
 
+        # Check develop presence now to tighten plan
+        dev_branch = get_develop_branch(config)
+        if not dev_branch:
+            _global_plan["total_weight"] = per_branch
+
         # Main branch
         status["progress"] = "main"
-        regenerate_repo(repo_name, config, granularity)
-        run_hotspot(repo_name, config)
+        if status.get("cancelled"): return
+        if not skip_archaeology and not path_prefix:
+            regenerate_repo(repo_name, config, granularity)
+        if status.get("cancelled"): return
+        run_hotspot(repo_name, config, path_prefix=path_prefix, timeline=timeline, timeline_granularity=timeline_granularity)
 
-        # Develop branch if exists — always save as "develop" regardless of actual name
-        dev_branch = get_develop_branch(config)
-        if dev_branch:
+        if dev_branch and not status.get("cancelled"):
             status["progress"] = "develop"
-            regenerate_repo(repo_name, config, granularity, branch=dev_branch, save_as="develop")
-            run_hotspot(repo_name, config, branch=dev_branch, save_as="develop")
+            if not skip_archaeology and not path_prefix:
+                regenerate_repo(repo_name, config, granularity, branch=dev_branch, save_as="develop")
+            if status.get("cancelled"): return
+            run_hotspot(repo_name, config, branch=dev_branch, save_as="develop",
+                        path_prefix=path_prefix, timeline=timeline,
+                        timeline_granularity=timeline_granularity)
 
         subprocess.run(
             ["uv", "run", "python", "generate_repos_list.py"],
@@ -146,6 +278,18 @@ class Handler(SimpleHTTPRequestHandler):
             super().do_GET()
 
     def do_POST(self):
+        if self.path == "/api/cancel":
+            if not status["running"]:
+                self._json_response({"error": "Nothing running"}, code=409)
+                return
+            status["cancelled"] = True
+            try:
+                if _current_proc is not None:
+                    _current_proc.terminate()
+            except Exception:
+                pass
+            self._json_response({"cancelling": True})
+            return
         if self.path == "/api/regenerate":
             if status["running"]:
                 self._json_response({"error": "Already running"}, code=409)
@@ -155,10 +299,13 @@ class Handler(SimpleHTTPRequestHandler):
             body = json.loads(self.rfile.read(length)) if length else {}
             granularity = body.get("granularity", "Week")
             repo = body.get("repo")
+            path_prefix = body.get("path_prefix", "")
+            timeline = int(body.get("timeline", 0) or 0)
+            timeline_granularity = body.get("timeline_granularity", "snapshot")
 
             if repo:
                 target = regenerate_single
-                args = (repo, granularity)
+                args = (repo, granularity, path_prefix, timeline, bool(path_prefix), timeline_granularity)
             else:
                 target = regenerate_all
                 args = (granularity,)

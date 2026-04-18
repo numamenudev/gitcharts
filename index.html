@@ -63,7 +63,61 @@
                     <button data-testid="regenerate-btn" id="regenerate-btn" class="btn btn-primary btn-sm">
                         Regenerate
                     </button>
+                    <button id="cancel-regenerate-btn" class="btn btn-outline-danger btn-sm" style="display:none;">
+                        Stop
+                    </button>
                     <span data-testid="regenerate-status" id="regenerate-status" class="ms-2 text-muted small"></span>
+                </div>
+            </div>
+
+            <div id="progress-row" class="mb-3" style="display:none;">
+                <div class="progress" style="height: 14px;">
+                    <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         role="progressbar" style="width: 0%">0%</div>
+                </div>
+                <div class="d-flex justify-content-between small text-muted mt-1">
+                    <span id="progress-label"></span>
+                    <span id="progress-eta"></span>
+                </div>
+            </div>
+
+            <!-- Regenerate options modal -->
+            <div class="modal fade" id="regenerate-modal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Regenerate <span id="regen-repo-name" class="text-primary"></span></h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label small">Path scope (optional)</label>
+                                <input type="text" id="regen-path-prefix" class="form-control form-control-sm"
+                                       placeholder="e.g. numa-backend/ — leave empty to scan entire repo">
+                                <div class="form-text">Restrict analysis to a sub-folder. Useful for big repos. When set, archaeology is skipped.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small">Timeline granularity</label>
+                                <select id="regen-timeline-granularity" class="form-select form-select-sm">
+                                    <option value="snapshot">N evenly-spaced snapshots</option>
+                                    <option value="day">One per day</option>
+                                    <option value="week">One per week</option>
+                                    <option value="month">One per month</option>
+                                </select>
+                                <div class="form-text">Evolution cadence. Daily gives a smooth timelapse; weekly/monthly are lighter.</div>
+                            </div>
+                            <div class="mb-3" id="regen-timeline-count-row">
+                                <label class="form-label small">Snapshots (N)</label>
+                                <input type="number" id="regen-timeline" class="form-control form-control-sm"
+                                       value="0" min="0" max="300" step="5">
+                                <div class="form-text">Only used for "N evenly-spaced". 0 = no timeline. 30-60 is a good range.</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                            <button id="regen-run-btn" class="btn btn-primary btn-sm">Start</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -104,6 +158,14 @@
 
             <div data-testid="chart-container" id="chart-container" class="border rounded p-3 bg-white" role="main" aria-live="polite">
                 <!-- Chart will be rendered here by JavaScript -->
+            </div>
+
+            <div id="timeline-row" class="hotspot-only mt-3" style="display:none;">
+                <div class="d-flex align-items-center gap-2">
+                    <button id="timeline-play-btn" class="btn btn-outline-secondary btn-sm" title="Play timeline">&#9658;</button>
+                    <input type="range" id="timeline-slider" class="form-range flex-grow-1" min="0" max="0" value="0">
+                    <span id="timeline-label" class="small text-muted" style="min-width: 180px; text-align: right;"></span>
+                </div>
             </div>
 
             <div id="insights-panel" class="mt-4" style="display:none;">

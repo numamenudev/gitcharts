@@ -74,7 +74,7 @@ function ensureTooltip(container) {
   return tooltipEl;
 }
 
-function buildTreemap(nodes, totalSize) {
+function buildTreemap(nodes) {
   // Convert flat node list to d3-hierarchy
   const byId = new Map(nodes.map(n => [n.id, { ...n, children: [] }]));
   const root = byId.get("root");
@@ -85,17 +85,31 @@ function buildTreemap(nodes, totalSize) {
     }
   }
   const h = hierarchy(root)
-    // Footprint size proportional to max(changes, 1) so all buildings visible
     .sum(d => (d.children && d.children.length) ? 0 : Math.max(d.changes || 0, 1))
     .sort((a, b) => (b.value || 0) - (a.value || 0));
   const layout = treemap()
     .tile(treemapSquarify.ratio(1.618))
     .size([WORLD_SIZE, WORLD_SIZE])
-    .paddingInner(2.4)   // gap between sibling files → the street width
-    .paddingOuter(3.5)   // gap between districts → bigger arterial streets
+    .paddingInner(2.4)
+    .paddingOuter(3.5)
     .paddingTop(3.5)
     .round(false)(h);
   return layout;
+}
+
+// Build a Map<id, {x0,y0,x1,y1,depth,parent}> from a master node list.
+// Callers pass union-of-all-snapshots nodes so positions are stable across playback.
+export function buildLayoutMap(masterNodes) {
+  const layout = buildTreemap(masterNodes);
+  if (!layout) return null;
+  const map = new Map();
+  layout.descendants().forEach(d => {
+    map.set(d.data.id, {
+      x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1,
+      depth: d.depth, parent: d.parent?.data?.id || null,
+    });
+  });
+  return map;
 }
 
 function disposeScene() {
@@ -135,7 +149,55 @@ export function disposeCity() {
   disposeScene();
 }
 
-export function renderCity(spec, container, meta = {}) {
+export function setAutoRotate(enabled) {
+  if (controls) {
+    controls.autoRotate = !!enabled;
+    controls.autoRotateSpeed = 0.8;
+  }
+}
+
+// Update existing buildings in-place with new per-file metrics without rebuilding
+// the scene (preserves camera, pedestrians, street layout). Used by timeline playback.
+export function updateCityMetrics(metricsById) {
+  if (!scene || buildings.length === 0) return;
+  let maxScore = 0.01;
+  let maxLoc = 1;
+  for (const m of Object.values(metricsById)) {
+    if (m.hotspot_score > maxScore) maxScore = m.hotspot_score;
+    if (m.loc > maxLoc) maxLoc = m.loc;
+  }
+  for (const b of buildings) {
+    const m = metricsById[b.mesh.userData.id];
+    if (m) {
+      const loc = m.loc || 0;
+      const h = Math.max(1, Math.sqrt(loc / maxLoc) * MAX_HEIGHT);
+      // scale.y of a BoxGeometry(w, initialH, d) gives final height = initialH * scale.y.
+      // Store initialH on userData on first call so we can recompute scale.
+      if (!b.mesh.userData._initH) {
+        b.mesh.userData._initH = b.mesh.geometry.parameters.height;
+      }
+      b.mesh.scale.y = h / b.mesh.userData._initH;
+      b.mesh.position.y = h / 2;
+      // Color
+      b.mesh.material.color.copy(_colorForScore(m.hotspot_score || 0, maxScore));
+      // Update userData for tooltip
+      b.mesh.userData.loc = m.loc;
+      b.mesh.userData.changes = m.changes;
+      b.mesh.userData.hotspot_score = m.hotspot_score;
+      b.mesh.userData.primary_author = m.primary_author;
+      b.mesh.visible = loc > 0 || (m.changes || 0) > 0;
+    } else {
+      // File doesn't exist at this snapshot → hide
+      b.mesh.visible = false;
+    }
+  }
+}
+
+function _colorForScore(score, maxScore) {
+  return colorForScore(score, maxScore);
+}
+
+export function renderCity(spec, container, meta = {}, opts = {}) {
   disposeScene();
   container.innerHTML = "";
 
@@ -145,13 +207,34 @@ export function renderCity(spec, container, meta = {}) {
     return;
   }
 
-  const layoutRoot = buildTreemap(nodes);
-  if (!layoutRoot) {
-    container.innerHTML = '<p class="text-danger">Invalid tree structure.</p>';
-    return;
+  // Either use a stable layoutMap (timeline mode) or compute fresh via d3-treemap
+  let leaves, topDistricts;
+  if (opts.layoutMap) {
+    const parentIds = new Set();
+    opts.layoutMap.forEach(pos => { if (pos.parent) parentIds.add(pos.parent); });
+    leaves = [];
+    topDistricts = [];
+    for (const n of nodes) {
+      const pos = opts.layoutMap.get(n.id);
+      if (!pos) continue;
+      const wrapped = { data: n, x0: pos.x0, y0: pos.y0, x1: pos.x1, y1: pos.y1, depth: pos.depth };
+      if (parentIds.has(n.id)) {
+        if (pos.depth === 1) topDistricts.push(wrapped);
+      } else if (n.id !== "root") {
+        leaves.push(wrapped);
+      }
+    }
+  } else {
+    const layoutRoot = buildTreemap(nodes);
+    if (!layoutRoot) {
+      container.innerHTML = '<p class="text-danger">Invalid tree structure.</p>';
+      return;
+    }
+    leaves = layoutRoot.leaves().filter(d => d.data.id !== "root");
+    topDistricts = layoutRoot.descendants().filter(d =>
+      d.depth === 1 && d.children && d.data.id !== "root"
+    );
   }
-
-  const leaves = layoutRoot.leaves().filter(d => d.data.id !== "root");
   const maxScore = Math.max(...leaves.map(d => d.data.hotspot_score || 0), 0.01);
   const maxLoc = Math.max(...leaves.map(d => d.data.loc || 0), 1);
 
@@ -216,9 +299,6 @@ export function renderCity(spec, container, meta = {}) {
   scene.add(coreGround);
 
   // Top-level district outlines — thin emissive border strips on asphalt, marking neighborhoods
-  const topDistricts = layoutRoot.descendants().filter(d =>
-    d.depth === 1 && d.children && d.data.id !== "root"
-  );
   const districtBorderMat = new THREE.MeshStandardMaterial({
     color: 0xe8d68a,
     emissive: 0x362a10,
@@ -433,11 +513,17 @@ export function renderCity(spec, container, meta = {}) {
   controls.maxDistance = WORLD_SIZE * 6;
   controls.maxPolarAngle = Math.PI / 2 - 0.05;
   controls.target.set(0, MAX_HEIGHT / 4, 0);
+  if (opts.autoRotate) {
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.8;
+  }
   controls.update();
 
-  // Raycaster for hover tooltip
+  // Raycaster for hover tooltip. Init pointer OUTSIDE valid NDC so first raycast
+  // hits nothing; only a real pointermove over the canvas activates the tooltip.
   raycaster = new THREE.Raycaster();
-  pointer = new THREE.Vector2();
+  pointer = new THREE.Vector2(100, 100);
+  let mouseInCanvas = false;
   ensureTooltip(container);
 
   pointerHandler = (ev) => {
@@ -447,7 +533,17 @@ export function renderCity(spec, container, meta = {}) {
     tooltipEl.style.left = (ev.clientX - rect.left + 12) + "px";
     tooltipEl.style.top = (ev.clientY - rect.top + 12) + "px";
   };
+  const leaveHandler = () => {
+    mouseInCanvas = false;
+    pointer.set(100, 100);
+    if (tooltipEl) tooltipEl.style.display = "none";
+  };
+  const enterHandler = () => { mouseInCanvas = true; };
   renderer.domElement.addEventListener("pointermove", pointerHandler);
+  renderer.domElement.addEventListener("pointerleave", leaveHandler);
+  renderer.domElement.addEventListener("pointerenter", enterHandler);
+  // Store ref so we can clean up
+  pedData = pedData; // noop just to satisfy linters; actual cleanup below
 
   // Resize handling
   resizeHandler = () => {
@@ -522,12 +618,15 @@ export function renderCity(spec, container, meta = {}) {
     updatePedestrians();
     updateSmoke();
 
-    // Hover detection
-    raycaster.setFromCamera(pointer, camera);
-    const intersects = raycaster.intersectObjects(buildings.map(b => b.mesh), false);
-    const newHover = intersects.length ? intersects[0].object : null;
+    // Hover detection — only when mouse is actually over the canvas
+    let newHover = null;
+    if (mouseInCanvas) {
+      raycaster.setFromCamera(pointer, camera);
+      const intersects = raycaster.intersectObjects(buildings.map(b => b.mesh), false);
+      newHover = intersects.length ? intersects[0].object : null;
+    }
 
-    if (hovered && hovered !== newHover) {
+    if (hovered && hovered !== newHover && hovered.material) {
       hovered.material.emissive.setHex(0x000000);
     }
     if (newHover && newHover !== hovered) {
@@ -535,7 +634,7 @@ export function renderCity(spec, container, meta = {}) {
     }
     hovered = newHover;
 
-    if (hovered) {
+    if (hovered && mouseInCanvas) {
       const d = hovered.userData;
       tooltipEl.innerHTML = `
         <div style="font-weight:600;word-break:break-all;margin-bottom:4px">${d.id}</div>

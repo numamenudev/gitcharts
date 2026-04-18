@@ -1,4 +1,4 @@
-import { renderCity, disposeCity } from "./city.js";
+import { renderCity, disposeCity, updateCityMetrics, setAutoRotate, buildLayoutMap } from "./city.js";
 
 // Application State
 const state = {
@@ -10,6 +10,7 @@ const state = {
   hotspotScope: "all", // "all" or top-level dir id
   invertLayers: false,
   loadedCharts: {}, // Cache: {repo-variant: vegaSpec}
+  timeline: null, // { snapshots: [...], index: 0, playing: false, playTimer: null }
 };
 
 // DOM Elements
@@ -586,10 +587,161 @@ async function updateHotspot() {
     await renderHotspotChart(scopedSpec);
     const insights = await loadInsights(state.currentRepo);
     renderInsights(insights, extractScopedRiskScores(scopedSpec));
+    await loadTimeline();
   } catch (error) {
     showError(state.currentRepo, hotspotVariantKey());
     renderInsights(null);
   }
+}
+
+function buildUnionMasterNodes(snapshots) {
+  const byId = new Map();
+  for (const snap of snapshots) {
+    for (const n of snap.nodes) {
+      if (!byId.has(n.id)) {
+        byId.set(n.id, { ...n });
+      } else {
+        const m = byId.get(n.id);
+        m.loc = Math.max(m.loc || 0, n.loc || 0);
+        m.changes = Math.max(m.changes || 0, n.changes || 0);
+        m.hotspot_score = Math.max(m.hotspot_score || 0, n.hotspot_score || 0);
+        if (!m.primary_author && n.primary_author) m.primary_author = n.primary_author;
+      }
+    }
+  }
+  return Array.from(byId.values());
+}
+
+function snapshotMetricsMap(snap) {
+  const map = {};
+  for (const n of snap.nodes) {
+    if (n.id !== "root") {
+      map[n.id] = {
+        loc: n.loc || 0,
+        changes: n.changes || 0,
+        hotspot_score: n.hotspot_score || 0,
+        primary_author: n.primary_author || "Unknown",
+      };
+    }
+  }
+  return map;
+}
+
+async function loadTimeline() {
+  if (state.timeline?.playTimer) clearInterval(state.timeline.playTimer);
+  state.timeline = null;
+  const row = document.getElementById("timeline-row");
+  row.style.display = "none";
+
+  const suffix = state.hotspotBranch === "develop" ? "-develop" : "";
+  try {
+    const res = await fetch(`charts/${state.currentRepo}${suffix}-timeline.json?t=${Date.now()}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.snapshots || data.snapshots.length === 0) return;
+    // Build stable master layout from union of all snapshots
+    const masterNodes = buildUnionMasterNodes(data.snapshots);
+    const layoutMap = buildLayoutMap(masterNodes);
+    state.timeline = {
+      snapshots: data.snapshots,
+      index: data.snapshots.length - 1,
+      playing: false, playTimer: null,
+      masterNodes,
+      layoutMap,
+    };
+    const slider = document.getElementById("timeline-slider");
+    slider.min = 0;
+    slider.max = data.snapshots.length - 1;
+    slider.value = state.timeline.index;
+    row.style.display = "";
+    updateTimelineLabel();
+
+    // In city view, render master layout so subsequent snapshots just update metrics in-place
+    if (state.currentView === "city" && layoutMap) {
+      const baseSpec = state.loadedCharts[`${state.currentRepo}-${hotspotVariantKey()}`]
+        || { data: [{ values: masterNodes }] };
+      const masterSpec = JSON.parse(JSON.stringify(baseSpec));
+      masterSpec.data[0].values = masterNodes;
+      renderCity(masterSpec, chartContainer, {
+        repo: state.currentRepo,
+        branch: state.hotspotBranch,
+        scope: state.hotspotScope,
+      }, { layoutMap });
+      // Apply initial snapshot metrics
+      updateCityMetrics(snapshotMetricsMap(data.snapshots[state.timeline.index]));
+    }
+  } catch {}
+}
+
+function updateTimelineLabel() {
+  if (!state.timeline) return;
+  const s = state.timeline.snapshots[state.timeline.index];
+  const el = document.getElementById("timeline-label");
+  el.textContent = `${s.date} — ${s.file_count} files, ${s.total_changes} changes`;
+}
+
+function applyTimelineSnapshot() {
+  if (!state.timeline) return;
+  const snap = state.timeline.snapshots[state.timeline.index];
+  if (state.currentView === "city") {
+    // Fast path: update existing buildings in-place (preserves camera + positions)
+    updateCityMetrics(snapshotMetricsMap(snap));
+  } else {
+    // 2D treemap: positions will still shift (Vega recomputes) — acceptable for now
+    const baseSpec = state.loadedCharts[`${state.currentRepo}-${hotspotVariantKey()}`];
+    if (baseSpec) {
+      const overlay = JSON.parse(JSON.stringify(baseSpec));
+      overlay.data[0].values = snap.nodes;
+      const scoped = filterSpecByScope(overlay, state.hotspotScope);
+      renderHotspotChart(scoped);
+    }
+  }
+  renderInsights(
+    { hotspots: [], stable: [], warnings: [], suggestions: [], total_files: snap.file_count, total_changes: snap.total_changes, repo: state.currentRepo },
+    snap.nodes.filter(n => n.hotspot_score !== undefined).map(n => n.hotspot_score),
+  );
+  updateTimelineLabel();
+}
+
+function onTimelineSliderInput(e) {
+  if (!state.timeline) return;
+  state.timeline.index = parseInt(e.target.value);
+  applyTimelineSnapshot();
+}
+
+function onTimelinePlayToggle() {
+  if (!state.timeline) return;
+  const btn = document.getElementById("timeline-play-btn");
+  if (state.timeline.playing) {
+    clearInterval(state.timeline.playTimer);
+    state.timeline.playTimer = null;
+    state.timeline.playing = false;
+    btn.innerHTML = "&#9658;";
+    setAutoRotate(false);
+    return;
+  }
+  if (state.timeline.index >= state.timeline.snapshots.length - 1) {
+    state.timeline.index = 0;
+    document.getElementById("timeline-slider").value = 0;
+    applyTimelineSnapshot();
+  }
+  state.timeline.playing = true;
+  btn.innerHTML = "&#10074;&#10074;";
+  setAutoRotate(true);
+  state.timeline.playTimer = setInterval(() => {
+    const next = state.timeline.index + 1;
+    if (next > state.timeline.snapshots.length - 1) {
+      clearInterval(state.timeline.playTimer);
+      state.timeline.playTimer = null;
+      state.timeline.playing = false;
+      btn.innerHTML = "&#9658;";
+      setAutoRotate(false);
+      return;
+    }
+    state.timeline.index = next;
+    document.getElementById("timeline-slider").value = next;
+    applyTimelineSnapshot();
+  }, 600);
 }
 
 async function updateCity() {
@@ -607,6 +759,7 @@ async function updateCity() {
     });
     const insights = await loadInsights(state.currentRepo);
     renderInsights(insights, extractScopedRiskScores(scopedSpec));
+    await loadTimeline();
   } catch (error) {
     console.error(error);
     showError(state.currentRepo, hotspotVariantKey());
@@ -877,6 +1030,14 @@ async function init() {
     .addEventListener("click", () => onViewChange("hotspot"));
   document.getElementById("view-btn-city")
     .addEventListener("click", () => onViewChange("city"));
+  document.getElementById("timeline-slider")
+    .addEventListener("input", onTimelineSliderInput);
+  document.getElementById("timeline-play-btn")
+    .addEventListener("click", onTimelinePlayToggle);
+  regenerateModal = new bootstrap.Modal(document.getElementById("regenerate-modal"));
+  document.getElementById("regen-run-btn").addEventListener("click", runRegenerate);
+  document.getElementById("cancel-regenerate-btn").addEventListener("click", onCancelRegenerate);
+  document.getElementById("regen-timeline-granularity").addEventListener("change", toggleTimelineCountRow);
   document.getElementById("hotspot-branch")
     .addEventListener("change", onHotspotBranchChange);
   document.getElementById("hotspot-scope")
@@ -891,28 +1052,104 @@ async function init() {
 // Regeneration
 // ========================================
 
-async function onRegenerate() {
+let regenerateModal;
+
+function onRegenerate() {
+  document.getElementById("regen-repo-name").textContent = state.currentRepo;
+  document.getElementById("regen-path-prefix").value = "";
+  document.getElementById("regen-timeline").value = "0";
+  document.getElementById("regen-timeline-granularity").value = "snapshot";
+  toggleTimelineCountRow();
+  regenerateModal.show();
+}
+
+function toggleTimelineCountRow() {
+  const gran = document.getElementById("regen-timeline-granularity").value;
+  document.getElementById("regen-timeline-count-row").style.display =
+    gran === "snapshot" ? "" : "none";
+}
+
+async function runRegenerate() {
   const granularity = granularitySelect.value;
   const repo = state.currentRepo;
+  const pathPrefix = document.getElementById("regen-path-prefix").value.trim();
+  const tlGran = document.getElementById("regen-timeline-granularity").value;
+  const timeline = tlGran === "snapshot"
+    ? (parseInt(document.getElementById("regen-timeline").value) || 0)
+    : 0;
+  regenerateModal.hide();
   regenerateBtn.disabled = true;
+  document.getElementById("cancel-regenerate-btn").style.display = "";
   regenerateStatus.textContent = `Generating ${repo}...`;
+  document.getElementById("progress-row").style.display = "";
 
   try {
     const res = await fetch("/api/regenerate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ granularity, repo }),
+      body: JSON.stringify({
+        granularity, repo,
+        path_prefix: pathPrefix,
+        timeline,
+        timeline_granularity: tlGran,
+      }),
     });
     const data = await res.json();
     if (data.error) {
       regenerateStatus.textContent = data.error;
       regenerateBtn.disabled = false;
+      document.getElementById("cancel-regenerate-btn").style.display = "none";
+      document.getElementById("progress-row").style.display = "none";
       return;
     }
     pollStatus();
   } catch (e) {
     regenerateStatus.textContent = "Error: " + e.message;
     regenerateBtn.disabled = false;
+    document.getElementById("progress-row").style.display = "none";
+  }
+}
+
+function formatETA(sec) {
+  if (sec == null || !isFinite(sec)) return "";
+  if (sec < 60) return `${Math.round(sec)}s`;
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}m ${s}s`;
+}
+
+function updateProgressBar(detail) {
+  const bar = document.getElementById("progress-bar");
+  const label = document.getElementById("progress-label");
+  const eta = document.getElementById("progress-eta");
+  if (!detail) {
+    bar.style.width = "0%";
+    bar.textContent = "0%";
+    label.textContent = "";
+    eta.textContent = "";
+    return;
+  }
+  // Prefer global_pct (bar fills continuously across phases); fallback to stage ratio
+  const pct = detail.global_pct != null
+    ? detail.global_pct
+    : (detail.total ? (detail.current / detail.total) * 100 : 0);
+  const clamped = Math.max(0, Math.min(100, pct));
+  bar.style.width = clamped.toFixed(1) + "%";
+  bar.textContent = clamped.toFixed(0) + "%";
+  const stageTxt = detail.stage ? `${detail.stage} — ` : "";
+  const subTxt = detail.label ? detail.label : "";
+  const ratio = detail.total ? ` (${detail.current}/${detail.total})` : "";
+  label.textContent = `${stageTxt}${subTxt}${ratio}`;
+  const etaStr = detail.eta != null ? ` · ETA ${formatETA(detail.eta)}` : "";
+  eta.textContent = `elapsed ${formatETA(detail.elapsed)}${etaStr}`;
+}
+
+async function onCancelRegenerate() {
+  try {
+    await fetch("/api/cancel", { method: "POST" });
+    regenerateStatus.textContent = "Cancelling...";
+  } catch (e) {
+    regenerateStatus.textContent = "Cancel error: " + e.message;
   }
 }
 
@@ -921,18 +1158,23 @@ async function pollStatus() {
     const res = await fetch("/api/status");
     const data = await res.json();
 
+    updateProgressBar(data.detail);
+
     if (data.running) {
       regenerateStatus.textContent = data.repo
         ? `Generating ${data.repo}...`
         : "Starting...";
-      setTimeout(pollStatus, 2000);
+      setTimeout(pollStatus, 1000);
     } else if (data.error) {
       regenerateStatus.textContent = "Error: " + data.error;
       regenerateBtn.disabled = false;
+      document.getElementById("cancel-regenerate-btn").style.display = "none";
+      document.getElementById("progress-row").style.display = "none";
     } else {
       regenerateStatus.textContent = "Done!";
       regenerateBtn.disabled = false;
-      // Clear chart cache and reload repos list (hotspot variant may have appeared)
+      document.getElementById("cancel-regenerate-btn").style.display = "none";
+      document.getElementById("progress-row").style.display = "none";
       state.loadedCharts = {};
       state.repos = await loadRepos();
       updateViewControls();
@@ -942,6 +1184,7 @@ async function pollStatus() {
   } catch (e) {
     regenerateStatus.textContent = "Error polling status";
     regenerateBtn.disabled = false;
+    document.getElementById("progress-row").style.display = "none";
   }
 }
 
