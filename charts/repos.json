@@ -31,6 +31,16 @@
     "clean",
     "versioned"
   ],
+  "numa-backend": [
+    "clean",
+    "versioned",
+    "hotspot",
+    "hotspot-develop"
+  ],
+  "numa-mobile": [
+    "hotspot",
+    "hotspot-develop"
+  ],
   "python-diskcache": [
     "clean",
     "versioned"

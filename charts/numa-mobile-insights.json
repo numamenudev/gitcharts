@@ -1,0 +1,56 @@
+{
+  "hotspots": [
+    {
+      "file": "pubspec.yaml",
+      "loc": 69,
+      "changes": 28,
+      "score": 118.96,
+      "primary_author": "Gabriele Di Martino",
+      "reason": "Modified 28 times, 69 lines — strong indicator of accumulated technical debt."
+    },
+    {
+      "file": "lib/app/router.dart",
+      "loc": 445,
+      "changes": 19,
+      "score": 115.91,
+      "primary_author": "Gabriele Di Martino",
+      "reason": "Modified 19 times, 445 lines — strong indicator of accumulated technical debt."
+    },
+    {
+      "file": "PRD.md",
+      "loc": 1516,
+      "changes": 14,
+      "score": 102.54,
+      "primary_author": "Nicolo' Bartolomei",
+      "reason": "Modified 14 times, 1,516 lines — strong indicator of accumulated technical debt."
+    }
+  ],
+  "stable": [
+    {
+      "path": "PROCESS_DOCS",
+      "total_changes": 8,
+      "file_count": 8,
+      "reason": "8 files, 8 total changes (avg 1.0/file) — stable, rarely modified code."
+    },
+    {
+      "path": "Valence_ext",
+      "total_changes": 11,
+      "file_count": 11,
+      "reason": "11 files, 11 total changes (avg 1.0/file) — stable, rarely modified code."
+    },
+    {
+      "path": "macos",
+      "total_changes": 18,
+      "file_count": 16,
+      "reason": "16 files, 18 total changes (avg 1.1/file) — stable, rarely modified code."
+    }
+  ],
+  "warnings": [],
+  "suggestions": [
+    "Add comprehensive tests for 'pubspec.yaml' — it changes frequently (28 times) and a regression here could have wide impact.",
+    "Prioritize code review for 'pubspec.yaml' and 'lib/app/router.dart' — they carry the highest risk scores and are the most likely sources of future bugs."
+  ],
+  "total_files": 554,
+  "total_changes": 1303,
+  "repo": "numa-mobile"
+}

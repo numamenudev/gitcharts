@@ -3,3 +3,6 @@ __marimo__/
 __pycache__/
 repo-cache
 git-research
+.playwright-mcp/
+city-*.png
+hotspot-*.png

@@ -1,0 +1,56 @@
+{
+  "hotspots": [
+    {
+      "file": "numa-backend/Extensions/ServiceCollectionExtensions.cs",
+      "loc": 428,
+      "changes": 55,
+      "score": 333.38,
+      "primary_author": "Nicolo' Bartolomei",
+      "reason": "Modified 55 times, 428 lines — strong indicator of accumulated technical debt."
+    },
+    {
+      "file": "numa-backend/Program.cs",
+      "loc": 396,
+      "changes": 37,
+      "score": 221.41,
+      "primary_author": "Nicolo' Bartolomei",
+      "reason": "Modified 37 times, 396 lines — strong indicator of accumulated technical debt."
+    },
+    {
+      "file": "numa-backend/Services/MenuService.cs",
+      "loc": 477,
+      "changes": 31,
+      "score": 191.26,
+      "primary_author": "Nicolo' Bartolomei",
+      "reason": "Modified 31 times, 477 lines — strong indicator of accumulated technical debt."
+    }
+  ],
+  "stable": [
+    {
+      "path": "supabase",
+      "total_changes": 9,
+      "file_count": 9,
+      "reason": "9 files, 9 total changes (avg 1.0/file) — stable, rarely modified code."
+    },
+    {
+      "path": "Valence_ext",
+      "total_changes": 12,
+      "file_count": 12,
+      "reason": "12 files, 12 total changes (avg 1.0/file) — stable, rarely modified code."
+    },
+    {
+      "path": "docs",
+      "total_changes": 25,
+      "file_count": 19,
+      "reason": "19 files, 25 total changes (avg 1.3/file) — stable, rarely modified code."
+    }
+  ],
+  "warnings": [],
+  "suggestions": [
+    "Add comprehensive tests for 'numa-backend/Extensions/ServiceCollectionExtensions.cs' — it changes frequently (55 times) and a regression here could have wide impact.",
+    "Prioritize code review for 'numa-backend/Extensions/ServiceCollectionExtensions.cs' and 'numa-backend/Program.cs' — they carry the highest risk scores and are the most likely sources of future bugs."
+  ],
+  "total_files": 1015,
+  "total_changes": 3004,
+  "repo": "numa-backend-develop"
+}

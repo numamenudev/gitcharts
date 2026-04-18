@@ -8,9 +8,24 @@ from pathlib import Path
 
 CONFIG_PATH = Path("repos_config.json")
 SCRIPT_PATH = Path("git_archaeology.py")
+HOTSPOT_SCRIPT_PATH = Path("hotspot_analysis.py")
 
 # Track regeneration status
 status = {"running": False, "repo": None, "progress": "", "error": None}
+
+
+def run_hotspot(repo_name, config, branch="", save_as=""):
+    """Run hotspot_analysis.py for a single repo/branch. Non-fatal on failure."""
+    cmd = [
+        "uv", "run", str(HOTSPOT_SCRIPT_PATH),
+        "--repo", config["url"],
+        "--file-extensions", config.get("extensions", ".py,.js,.ts,.java,.c,.cpp,.h,.go,.rs"),
+    ]
+    if branch:
+        cmd += ["--branch", branch]
+        if save_as and save_as != branch:
+            cmd += ["--branch-label", save_as]
+    subprocess.run(cmd, capture_output=True, text=True, timeout=600)
 
 
 def regenerate_repo(repo_name, config, granularity, branch="", save_as=""):
@@ -66,12 +81,14 @@ def regenerate_single(repo_name, granularity):
         # Main branch
         status["progress"] = "main"
         regenerate_repo(repo_name, config, granularity)
+        run_hotspot(repo_name, config)
 
         # Develop branch if exists — always save as "develop" regardless of actual name
         dev_branch = get_develop_branch(config)
         if dev_branch:
             status["progress"] = "develop"
             regenerate_repo(repo_name, config, granularity, branch=dev_branch, save_as="develop")
+            run_hotspot(repo_name, config, branch=dev_branch, save_as="develop")
 
         subprocess.run(
             ["uv", "run", "python", "generate_repos_list.py"],
@@ -98,11 +115,13 @@ def regenerate_all(granularity):
             status["repo"] = name
             status["progress"] = f"{i}/{total} main"
             regenerate_repo(name, config, granularity)
+            run_hotspot(name, config)
 
             dev_branch = get_develop_branch(config)
             if dev_branch:
                 status["progress"] = f"{i}/{total} develop"
                 regenerate_repo(name, config, granularity, branch=dev_branch, save_as="develop")
+                run_hotspot(name, config, branch=dev_branch, save_as="develop")
 
         subprocess.run(
             ["uv", "run", "python", "generate_repos_list.py"],

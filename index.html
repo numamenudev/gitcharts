@@ -24,10 +24,10 @@
                         <!-- Populated by JavaScript -->
                     </select>
                 </div>
-                <div class="col-auto">
+                <div class="col-auto archaeology-only">
                     <label for="granularity-select" class="col-form-label">Granularity:</label>
                 </div>
-                <div class="col-auto">
+                <div class="col-auto archaeology-only">
                     <select data-testid="granularity-select" id="granularity-select" class="form-select">
                         <option value="Day">Day</option>
                         <option value="Week" selected>Week</option>
@@ -36,25 +36,30 @@
                         <option value="Year">Year</option>
                     </select>
                 </div>
-                <div class="col-auto">
+                <div class="col-auto archaeology-only">
                     <div class="form-check">
                         <input data-testid="show-tags" class="form-check-input" type="checkbox" id="show-tags">
                         <label class="form-check-label" for="show-tags">Show tags</label>
                     </div>
                 </div>
-                <div class="col-auto">
+                <div class="col-auto archaeology-only">
                     <div class="form-check">
                         <input data-testid="show-develop" class="form-check-input" type="checkbox" id="show-develop">
                         <label class="form-check-label" for="show-develop">Show develop</label>
                     </div>
                 </div>
-                <div class="col-auto">
+                <div class="col-auto archaeology-only">
                     <div class="form-check">
                         <input data-testid="invert-layers" type="checkbox" class="form-check-input" id="invert-layers" autocomplete="off">
                         <label class="form-check-label" for="invert-layers">Invert layers</label>
                     </div>
                 </div>
-                <div class="col-auto ms-auto">
+                <div class="col-auto ms-auto d-flex align-items-center gap-2">
+                    <div class="btn-group btn-group-sm" role="group" aria-label="View">
+                        <button id="view-btn-archaeology" data-view="archaeology" class="btn btn-outline-secondary active">Archaeology</button>
+                        <button id="view-btn-hotspot" data-view="hotspot" class="btn btn-outline-secondary">Hotspot</button>
+                        <button id="view-btn-city" data-view="city" class="btn btn-outline-secondary">City (3D)</button>
+                    </div>
                     <button data-testid="regenerate-btn" id="regenerate-btn" class="btn btn-primary btn-sm">
                         Regenerate
                     </button>
@@ -62,7 +67,24 @@
                 </div>
             </div>
 
-            <div class="row g-3 mb-4 align-items-center">
+            <div id="hotspot-controls" class="row g-3 mb-4 align-items-center hotspot-only" style="display:none;">
+                <div class="col-auto">
+                    <label for="hotspot-branch" class="col-form-label">Branch:</label>
+                </div>
+                <div class="col-auto">
+                    <select id="hotspot-branch" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-auto">
+                    <label for="hotspot-scope" class="col-form-label">Folder:</label>
+                </div>
+                <div class="col-auto">
+                    <select id="hotspot-scope" class="form-select form-select-sm">
+                        <option value="all">All files</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="date-range-row" class="row g-3 mb-4 align-items-center archaeology-only">
                 <div class="col-auto">
                     <label for="date-from" class="col-form-label">From:</label>
                 </div>
@@ -82,6 +104,44 @@
 
             <div data-testid="chart-container" id="chart-container" class="border rounded p-3 bg-white" role="main" aria-live="polite">
                 <!-- Chart will be rendered here by JavaScript -->
+            </div>
+
+            <div id="insights-panel" class="mt-4" style="display:none;">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <div class="card border-secondary">
+                            <div class="card-header fw-semibold">How to read this chart</div>
+                            <div class="card-body small text-muted" id="insights-legend">
+                                <strong>Size</strong> = lines of code (LOC). Bigger rectangle = bigger file.<br>
+                                <strong>Color</strong> = risk score (changes &times; log LOC). <span class="text-danger fw-semibold">Red</span> = high change frequency &amp; large file = likely technical debt. <span class="text-success fw-semibold">Green</span> = stable or small.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6" id="insights-hotspots-col">
+                        <div class="card border-danger h-100">
+                            <div class="card-header text-danger fw-semibold">Top hotspots</div>
+                            <div class="card-body small" id="insights-hotspots"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6" id="insights-stable-col">
+                        <div class="card border-success h-100">
+                            <div class="card-header text-success fw-semibold">Stable areas</div>
+                            <div class="card-body small" id="insights-stable"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6" id="insights-warnings-col">
+                        <div class="card border-warning h-100">
+                            <div class="card-header text-warning-emphasis fw-semibold">Warnings</div>
+                            <div class="card-body small" id="insights-warnings"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6" id="insights-suggestions-col">
+                        <div class="card border-primary h-100">
+                            <div class="card-header text-primary fw-semibold">Suggestions</div>
+                            <div class="card-body small" id="insights-suggestions"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
 
@@ -123,6 +183,17 @@
 
     <!-- Bootstrap JS (for modal) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- ES module imports for Three.js + d3 -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+        "d3-hierarchy": "https://cdn.jsdelivr.net/npm/d3-hierarchy@3/+esm"
+      }
+    }
+    </script>
 
     <!-- Application Scripts -->
     <script type="module" src="js/app.js"></script>

@@ -12,23 +12,31 @@ def main():
         print("charts/ directory not found")
         return
 
-    # Find all -clean.json files to get unique repo names
-    # Exclude develop branch files (e.g. repo-develop-clean.json)
-    clean_files = list(charts_dir.glob("*-clean.json"))
+    # Collect unique repo names from any available chart file (clean OR hotspot)
+    names = set()
+    for pattern in ("*-clean.json", "*-hotspot.json"):
+        for file in charts_dir.glob(pattern):
+            stem = file.stem
+            name = stem.replace("-clean", "").replace("-hotspot", "")
+            # Strip develop/dev/development branch suffix
+            for branch_suffix in ("-develop", "-development", "-dev"):
+                if name.endswith(branch_suffix):
+                    name = name[: -len(branch_suffix)]
+                    break
+            if name and name != "repos":
+                names.add(name)
 
     repos = {}
-    for file in clean_files:
-        name = file.stem.replace("-clean", "")
-        # Skip develop/dev/development branch files
-        if name.endswith(("-develop", "-development", "-dev")):
-            continue
-
-        variants = ["clean"]
-
-        versioned_file = charts_dir / f"{name}-versioned.json"
-        if versioned_file.exists():
+    for name in names:
+        variants = []
+        if (charts_dir / f"{name}-clean.json").exists():
+            variants.append("clean")
+        if (charts_dir / f"{name}-versioned.json").exists():
             variants.append("versioned")
-
+        if (charts_dir / f"{name}-hotspot.json").exists():
+            variants.append("hotspot")
+        if (charts_dir / f"{name}-develop-hotspot.json").exists():
+            variants.append("hotspot-develop")
         repos[name] = variants
 
     # Sort by name for consistency

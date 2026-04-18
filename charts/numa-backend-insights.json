@@ -1,0 +1,56 @@
+{
+  "hotspots": [
+    {
+      "file": "guidelines.md",
+      "loc": 2506,
+      "changes": 3,
+      "score": 23.48,
+      "primary_author": "Nicolo' Bartolomei",
+      "reason": "Modified 3 times, 2,506 lines — strong indicator of accumulated technical debt."
+    },
+    {
+      "file": "CLAUDE.md",
+      "loc": 589,
+      "changes": 3,
+      "score": 19.14,
+      "primary_author": "Nicolo' Bartolomei",
+      "reason": "Modified 3 times, 589 lines — strong indicator of accumulated technical debt."
+    },
+    {
+      "file": "backlog/tasks/task-64 - Write-unit-tests-for-ChatService.md",
+      "loc": 209,
+      "changes": 3,
+      "score": 16.04,
+      "primary_author": "Nicolo' Bartolomei",
+      "reason": "Modified 3 times, 209 lines — strong indicator of accumulated technical debt."
+    }
+  ],
+  "stable": [
+    {
+      "path": "numa-backend",
+      "total_changes": 6,
+      "file_count": 6,
+      "reason": "6 files, 6 total changes (avg 1.0/file) — stable, rarely modified code."
+    },
+    {
+      "path": "supabase",
+      "total_changes": 25,
+      "file_count": 25,
+      "reason": "25 files, 25 total changes (avg 1.0/file) — stable, rarely modified code."
+    },
+    {
+      "path": "(root)",
+      "total_changes": 42,
+      "file_count": 30,
+      "reason": "30 files, 42 total changes (avg 1.4/file) — stable, rarely modified code."
+    }
+  ],
+  "warnings": [],
+  "suggestions": [
+    "Split 'guidelines.md' into smaller focused modules — 2,506 lines and 3 modifications make it the biggest maintenance burden in the repo.",
+    "Prioritize code review for 'guidelines.md' and 'CLAUDE.md' — they carry the highest risk scores and are the most likely sources of future bugs."
+  ],
+  "total_files": 127,
+  "total_changes": 221,
+  "repo": "numa-backend"
+}

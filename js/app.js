@@ -1,8 +1,13 @@
+import { renderCity, disposeCity } from "./city.js";
+
 // Application State
 const state = {
   repos: {}, // Will be loaded from repos.json: {name: [variants]}
   currentRepo: null,
   currentVariant: "clean",
+  currentView: "archaeology", // "archaeology" | "hotspot" | "city"
+  hotspotBranch: "main", // "main" | "develop" (auto-selects develop if available)
+  hotspotScope: "all", // "all" or top-level dir id
   invertLayers: false,
   loadedCharts: {}, // Cache: {repo-variant: vegaSpec}
 };
@@ -37,38 +42,59 @@ function parseURL() {
   const names = repoNames();
   const defaultRepo = names[0] || "scikit-lego";
 
+  const defaultFor = (repo) => {
+    const vs = state.repos[repo] || [];
+    if (vs.includes("clean")) return { variant: "clean", view: "archaeology" };
+    if (vs.includes("hotspot")) return { variant: "clean", view: "city" };
+    return { variant: "clean", view: "archaeology" };
+  };
+
   if (!hash) {
-    return {
-      repo: defaultRepo,
-      variant: "clean",
-    };
+    return { repo: defaultRepo, ...defaultFor(defaultRepo) };
   }
 
   const parts = hash.split("/");
   const repo = parts[0] || defaultRepo;
-  const variant = parts[1] || "clean";
+  const segment = parts[1];
 
-  // Validate repo exists in loaded repos
   const validRepo = names.includes(repo) ? repo : defaultRepo;
+  const availableVariants = state.repos[validRepo] || [];
 
-  // Validate variant is available for this repo
-  const availableVariants = state.repos[validRepo] || ["clean"];
-  const validVariant = availableVariants.includes(variant) ? variant : "clean";
+  if (!segment) return { repo: validRepo, ...defaultFor(validRepo) };
 
-  return {
-    repo: validRepo,
-    variant: validVariant,
-  };
+  if (segment === "hotspot" || segment === "city") {
+    const view = availableVariants.includes("hotspot") ? segment : "archaeology";
+    return { repo: validRepo, variant: "clean", view };
+  }
+
+  const validVariant = availableVariants.includes(segment) ? segment : "clean";
+  return { repo: validRepo, variant: validVariant, view: "archaeology" };
 }
 
 /**
  * Update URL hash based on current state
  */
 function updateURL() {
-  const hash = `#${state.currentRepo}/${state.currentVariant}`;
+  let segment;
+  if (state.currentView === "hotspot") segment = "hotspot";
+  else if (state.currentView === "city") segment = "city";
+  else segment = state.currentVariant;
+  const hash = `#${state.currentRepo}/${segment}`;
   if (window.location.hash !== hash) {
     window.history.pushState(null, "", hash);
   }
+}
+
+function hasHotspot(repo) {
+  return (state.repos[repo] || []).includes("hotspot");
+}
+
+function hasHotspotDevelop(repo) {
+  return (state.repos[repo] || []).includes("hotspot-develop");
+}
+
+function hotspotVariantKey() {
+  return state.hotspotBranch === "develop" ? "develop-hotspot" : "hotspot";
 }
 
 // ========================================
@@ -335,7 +361,7 @@ function mergeWithDevelop(mainSpec, devSpec) {
   };
 }
 
-async function updateChart() {
+async function updateArchaeology() {
   showLoading();
 
   try {
@@ -357,6 +383,249 @@ async function updateChart() {
     await renderChart(spec);
   } catch (error) {
     showError(state.currentRepo, state.currentVariant);
+  }
+}
+
+async function loadInsights(repo) {
+  const suffix = state.hotspotBranch === "develop" ? "-develop" : "";
+  try {
+    const res = await fetch(`charts/${repo}${suffix}-insights.json?t=${Date.now()}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function extractTopLevelDirs(spec) {
+  const nodes = spec?.data?.[0]?.values || [];
+  // A node is a directory if at least one other node has it as parent
+  const parentIds = new Set(nodes.map(n => n.parent).filter(Boolean));
+  const dirs = [];
+  const fileCounts = {};
+  for (const n of nodes) {
+    if (n.parent === "root" && n.id !== "root" && parentIds.has(n.id)) {
+      dirs.push(n.id);
+    }
+  }
+  // Count descendant leaf files per top-level dir
+  for (const n of nodes) {
+    if (n.parent === "root" || !n.parent) continue;
+    if (parentIds.has(n.id)) continue; // skip intermediate dirs, count only files
+    const top = n.id.split("/")[0];
+    fileCounts[top] = (fileCounts[top] || 0) + 1;
+  }
+  return dirs
+    .map(d => ({ id: d, count: fileCounts[d] || 0 }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function populateScopeDropdown(spec) {
+  const sel = document.getElementById("hotspot-scope");
+  const dirs = extractTopLevelDirs(spec);
+  const prev = state.hotspotScope;
+  sel.innerHTML = '<option value="all">All files</option>';
+  for (const d of dirs) {
+    const opt = document.createElement("option");
+    opt.value = d.id;
+    opt.textContent = `${d.id}/ (${d.count})`;
+    sel.appendChild(opt);
+  }
+  // Preserve previous scope if still valid
+  if (prev && (prev === "all" || dirs.some(d => d.id === prev))) {
+    sel.value = prev;
+  } else {
+    sel.value = "all";
+    state.hotspotScope = "all";
+  }
+}
+
+function populateBranchDropdown() {
+  const sel = document.getElementById("hotspot-branch");
+  const hasDev = hasHotspotDevelop(state.currentRepo);
+  sel.innerHTML = "";
+  const addOpt = (v, label) => {
+    const o = document.createElement("option");
+    o.value = v; o.textContent = label;
+    sel.appendChild(o);
+  };
+  addOpt("main", "main");
+  if (hasDev) addOpt("develop", "develop");
+  sel.value = state.hotspotBranch;
+}
+
+function filterSpecByScope(spec, scope) {
+  if (scope === "all") return spec;
+  const copy = JSON.parse(JSON.stringify(spec));
+  const values = copy.data[0].values || [];
+  const filtered = values.filter(n =>
+    n.id === "root" ||
+    n.id === scope ||
+    n.id.startsWith(scope + "/")
+  );
+  copy.data[0].values = filtered;
+  return copy;
+}
+
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function buildRiskBands(scores) {
+  if (!scores || scores.length === 0) return null;
+  const sorted = scores.slice().sort((a, b) => a - b);
+  const pct = p => sorted[Math.max(0, Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * p)))];
+  const fmt = v => v < 10 ? v.toFixed(1) : Math.round(v).toString();
+  return {
+    p50: pct(0.5), p75: pct(0.75), p90: pct(0.9), max: sorted[sorted.length - 1],
+    fmt,
+  };
+}
+
+function riskBandHTML(b) {
+  if (!b) return "";
+  const { p50, p75, p90, max, fmt } = b;
+  return `
+    <div class="mt-2 pt-2 border-top">
+      <div class="fw-semibold mb-1 text-body">Risk score ranges <small class="text-body-secondary fw-normal">(this repository)</small></div>
+      <div class="d-flex flex-wrap gap-2" style="font-size:0.82rem">
+        <span><span class="badge" style="background:#1a9641">0 – ${fmt(p50)}</span> Stable, rarely touched</span>
+        <span><span class="badge" style="background:#a6d96a;color:#222">${fmt(p50)} – ${fmt(p75)}</span> Low risk</span>
+        <span><span class="badge" style="background:#fdae61;color:#222">${fmt(p75)} – ${fmt(p90)}</span> Elevated — watch it</span>
+        <span><span class="badge" style="background:#d7191c">${fmt(p90)} – ${fmt(max)}</span> Critical hotspot</span>
+      </div>
+      <div class="text-body-secondary mt-1" style="font-size:0.78rem">Bands split at median, 75th, and 90th percentiles of this repo's file scores.</div>
+    </div>
+  `;
+}
+
+function renderInsights(insights, riskScores) {
+  const panel = document.getElementById("insights-panel");
+  if (!insights) { panel.style.display = "none"; return; }
+  panel.style.display = "";
+
+  const bands = buildRiskBands(riskScores);
+  const legend = document.getElementById("insights-legend");
+  if (legend) {
+    const base = state.currentView === "city"
+      ? `
+        <strong>Height</strong> = lines of code (LOC). Tall tower = big file.<br>
+        <strong>Footprint</strong> = number of modifications. Wide base = frequently changed.<br>
+        <strong>Color</strong> = risk score (changes &times; log LOC). <span class="text-danger fw-semibold">Red</span> = likely technical debt. <span class="text-success fw-semibold">Green</span> = stable.<br>
+        <span class="text-body-secondary">Drag to rotate · scroll to zoom · hover for details.</span>
+      `
+      : `
+        <strong>Size</strong> = lines of code (LOC). Bigger rectangle = bigger file.<br>
+        <strong>Color</strong> = risk score (changes &times; log LOC). <span class="text-danger fw-semibold">Red</span> = high change frequency &amp; large file = likely technical debt. <span class="text-success fw-semibold">Green</span> = stable or small.
+      `;
+    legend.innerHTML = base + riskBandHTML(bands);
+  }
+
+  const hotspotsEl = document.getElementById("insights-hotspots");
+  if (insights.hotspots?.length) {
+    hotspotsEl.innerHTML = insights.hotspots.map(h => `
+      <div class="mb-2">
+        <div class="fw-semibold"><code>${escapeHTML(h.file)}</code></div>
+        <div class="text-muted">${escapeHTML(h.reason)} <span class="text-body-secondary">(main author: ${escapeHTML(h.primary_author)})</span></div>
+      </div>
+    `).join("");
+  } else {
+    hotspotsEl.innerHTML = '<span class="text-muted">No hotspots detected.</span>';
+  }
+
+  const stableEl = document.getElementById("insights-stable");
+  if (insights.stable?.length) {
+    stableEl.innerHTML = insights.stable.map(s => `
+      <div class="mb-2">
+        <div class="fw-semibold"><code>${escapeHTML(s.path)}/</code></div>
+        <div class="text-muted">${escapeHTML(s.reason)}</div>
+      </div>
+    `).join("");
+  } else {
+    stableEl.innerHTML = '<span class="text-muted">No clearly stable area detected.</span>';
+  }
+
+  const warningsEl = document.getElementById("insights-warnings");
+  if (insights.warnings?.length) {
+    warningsEl.innerHTML = insights.warnings.map(w => `<div class="mb-2">${escapeHTML(w)}</div>`).join("");
+  } else {
+    warningsEl.innerHTML = '<span class="text-muted">No anomalies detected.</span>';
+  }
+
+  const suggestionsEl = document.getElementById("insights-suggestions");
+  if (insights.suggestions?.length) {
+    suggestionsEl.innerHTML = insights.suggestions.map(s => `<div class="mb-2">${escapeHTML(s)}</div>`).join("");
+  } else {
+    suggestionsEl.innerHTML = '<span class="text-muted">No specific suggestions.</span>';
+  }
+}
+
+async function renderHotspotChart(spec) {
+  chartContainer.innerHTML = "";
+  chartContainer.className = "";
+  await vegaEmbed("#chart-container", spec, {
+    actions: { export: true, source: false, compiled: false, editor: false },
+  });
+}
+
+function extractScopedRiskScores(spec) {
+  const nodes = spec?.data?.[0]?.values || [];
+  return nodes
+    .filter(n => n.hotspot_score !== undefined && n.parent && n.parent !== null && n.id !== "root")
+    .map(n => n.hotspot_score);
+}
+
+async function updateHotspot() {
+  showLoading();
+  try {
+    const spec = await loadChart(state.currentRepo, hotspotVariantKey());
+    populateScopeDropdown(spec);
+    const scopedSpec = filterSpecByScope(spec, state.hotspotScope);
+    await renderHotspotChart(scopedSpec);
+    const insights = await loadInsights(state.currentRepo);
+    renderInsights(insights, extractScopedRiskScores(scopedSpec));
+  } catch (error) {
+    showError(state.currentRepo, hotspotVariantKey());
+    renderInsights(null);
+  }
+}
+
+async function updateCity() {
+  showLoading();
+  try {
+    const spec = await loadChart(state.currentRepo, hotspotVariantKey());
+    populateScopeDropdown(spec);
+    const scopedSpec = filterSpecByScope(spec, state.hotspotScope);
+    chartContainer.innerHTML = "";
+    chartContainer.className = "";
+    renderCity(scopedSpec, chartContainer, {
+      repo: state.currentRepo,
+      branch: state.hotspotBranch,
+      scope: state.hotspotScope,
+    });
+    const insights = await loadInsights(state.currentRepo);
+    renderInsights(insights, extractScopedRiskScores(scopedSpec));
+  } catch (error) {
+    console.error(error);
+    showError(state.currentRepo, hotspotVariantKey());
+    renderInsights(null);
+  }
+}
+
+async function updateChart() {
+  // Dispose previous city renderer if leaving city view
+  if (state.currentView !== "city") {
+    disposeCity();
+  }
+  if (state.currentView === "hotspot") {
+    await updateHotspot();
+  } else if (state.currentView === "city") {
+    await updateCity();
+  } else {
+    document.getElementById("insights-panel").style.display = "none";
+    await updateArchaeology();
   }
 }
 
@@ -384,6 +653,57 @@ function updateToggle() {
 function updateUI() {
   updateDropdown();
   updateToggle();
+  updateViewControls();
+}
+
+function updateViewControls() {
+  const hotspotAvailable = hasHotspot(state.currentRepo);
+  const btnArch = document.getElementById("view-btn-archaeology");
+  const btnHot = document.getElementById("view-btn-hotspot");
+  const btnCity = document.getElementById("view-btn-city");
+
+  // If hotspot/city view requested but not available, fallback to archaeology
+  if ((state.currentView === "hotspot" || state.currentView === "city") && !hotspotAvailable) {
+    state.currentView = "archaeology";
+  }
+
+  btnHot.disabled = !hotspotAvailable;
+  btnCity.disabled = !hotspotAvailable;
+  const title = hotspotAvailable ? "" : "No hotspot data — regenerate this repo first";
+  btnHot.title = title;
+  btnCity.title = title;
+
+  btnArch.classList.toggle("active", state.currentView === "archaeology");
+  btnHot.classList.toggle("active", state.currentView === "hotspot");
+  btnCity.classList.toggle("active", state.currentView === "city");
+
+  const isHotspotLike = state.currentView === "hotspot" || state.currentView === "city";
+  document.querySelectorAll(".archaeology-only").forEach(el => {
+    el.style.display = isHotspotLike ? "none" : "";
+  });
+  document.querySelectorAll(".hotspot-only").forEach(el => {
+    el.style.display = isHotspotLike ? "" : "none";
+  });
+  if (!isHotspotLike) {
+    document.getElementById("insights-panel").style.display = "none";
+  } else {
+    if (hasHotspotDevelop(state.currentRepo) && state.hotspotBranch === "main") {
+      state.hotspotBranch = "develop";
+    }
+    if (!hasHotspotDevelop(state.currentRepo)) {
+      state.hotspotBranch = "main";
+    }
+    populateBranchDropdown();
+  }
+}
+
+function onViewChange(view) {
+  if (view === state.currentView) return;
+  if ((view === "hotspot" || view === "city") && !hasHotspot(state.currentRepo)) return;
+  state.currentView = view;
+  updateViewControls();
+  updateURL();
+  updateChart();
 }
 
 // ========================================
@@ -395,8 +715,28 @@ function updateUI() {
  */
 function onRepoChange(event) {
   state.currentRepo = event.target.value;
+  // Reset scope — dirs differ per repo
+  state.hotspotScope = "all";
+  // Auto-default branch to develop if available for new repo
+  state.hotspotBranch = hasHotspotDevelop(state.currentRepo) ? "develop" : "main";
+  // Fallback to archaeology if new repo lacks hotspot
+  if (state.currentView === "hotspot" && !hasHotspot(state.currentRepo)) {
+    state.currentView = "archaeology";
+  }
   updateToggle();
+  updateViewControls();
   updateURL();
+  updateChart();
+}
+
+function onHotspotBranchChange(event) {
+  state.hotspotBranch = event.target.value;
+  state.hotspotScope = "all"; // reset scope when switching branches
+  updateChart();
+}
+
+function onHotspotScopeChange(event) {
+  state.hotspotScope = event.target.value;
   updateChart();
 }
 
@@ -421,9 +761,10 @@ function onInvertChange(event) {
  * Handle browser back/forward navigation
  */
 function onPopState() {
-  const { repo, variant } = parseURL();
+  const { repo, variant, view } = parseURL();
   state.currentRepo = repo;
   state.currentVariant = variant;
+  state.currentView = view;
   updateUI();
   updateChart();
 }
@@ -501,9 +842,11 @@ async function init() {
   populateDropdown();
 
   // Parse URL and set initial state
-  const { repo, variant } = parseURL();
+  const { repo, variant, view } = parseURL();
   state.currentRepo = repo;
   state.currentVariant = variant;
+  state.currentView = view;
+  state.hotspotBranch = hasHotspotDevelop(state.currentRepo) ? "develop" : "main";
 
   // Update UI to reflect initial state
   updateUI();
@@ -528,6 +871,16 @@ async function init() {
     dateTo.value = "";
     updateChart();
   });
+  document.getElementById("view-btn-archaeology")
+    .addEventListener("click", () => onViewChange("archaeology"));
+  document.getElementById("view-btn-hotspot")
+    .addEventListener("click", () => onViewChange("hotspot"));
+  document.getElementById("view-btn-city")
+    .addEventListener("click", () => onViewChange("city"));
+  document.getElementById("hotspot-branch")
+    .addEventListener("change", onHotspotBranchChange);
+  document.getElementById("hotspot-scope")
+    .addEventListener("change", onHotspotScopeChange);
   window.addEventListener("popstate", onPopState);
 
   // Load and render initial chart
@@ -579,8 +932,10 @@ async function pollStatus() {
     } else {
       regenerateStatus.textContent = "Done!";
       regenerateBtn.disabled = false;
-      // Clear chart cache and force reload from server
+      // Clear chart cache and reload repos list (hotspot variant may have appeared)
       state.loadedCharts = {};
+      state.repos = await loadRepos();
+      updateViewControls();
       await updateChart();
       setTimeout(() => { regenerateStatus.textContent = ""; }, 3000);
     }
