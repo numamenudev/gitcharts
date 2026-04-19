@@ -577,6 +577,34 @@ def collect_timeline_metrics(
             "nodes": nodes,
         })
 
+    # Daily granularity: fill calendar gaps (days without commits) by repeating the
+    # previous day's state, so the timeline moves in real time units.
+    if granularity == "day" and snapshots:
+        from datetime import timedelta
+        snaps_by_date = {s["date"]: s for s in snapshots}
+        d0 = datetime.strptime(snapshots[0]["date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        d_end = datetime.strptime(snapshots[-1]["date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        filled: list[dict] = []
+        prev: dict | None = None
+        d = d0
+        while d <= d_end:
+            key = d.strftime("%Y-%m-%d")
+            if key in snaps_by_date:
+                prev = snaps_by_date[key]
+                filled.append(prev)
+            elif prev is not None:
+                filled.append({
+                    "commit": prev["commit"],
+                    "date": key,
+                    "timestamp": int(d.timestamp()),
+                    "file_count": prev["file_count"],
+                    "total_changes": prev["total_changes"],
+                    "nodes": prev["nodes"],
+                    "carried": True,
+                })
+            d += timedelta(days=1)
+        snapshots = filled
+
     return snapshots
 
 

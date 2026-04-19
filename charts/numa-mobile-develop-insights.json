@@ -1,6 +1,14 @@
 {
   "hotspots": [
     {
+      "file": "pubspec.lock",
+      "loc": 1378,
+      "changes": 37,
+      "score": 267.48,
+      "primary_author": "Gabriele Di Martino",
+      "reason": "Modified 37 times, 1,378 lines — strong indicator of accumulated technical debt."
+    },
+    {
       "file": "lib/app/router.dart",
       "loc": 639,
       "changes": 39,
@@ -15,23 +23,9 @@
       "score": 176.47,
       "primary_author": "Gabriele Di Martino",
       "reason": "Modified 41 times, 73 lines — strong indicator of accumulated technical debt."
-    },
-    {
-      "file": "PRD.md",
-      "loc": 1516,
-      "changes": 14,
-      "score": 102.54,
-      "primary_author": "Nicolo' Bartolomei",
-      "reason": "Modified 14 times, 1,516 lines — strong indicator of accumulated technical debt."
     }
   ],
   "stable": [
-    {
-      "path": "scripts",
-      "total_changes": 7,
-      "file_count": 4,
-      "reason": "4 files, 7 total changes (avg 1.8/file) — stable, rarely modified code."
-    },
     {
       "path": "PROCESS_DOCS",
       "total_changes": 8,
@@ -39,18 +33,24 @@
       "reason": "8 files, 8 total changes (avg 1.0/file) — stable, rarely modified code."
     },
     {
-      "path": "Valence_ext",
+      "path": "scripts",
       "total_changes": 11,
-      "file_count": 11,
-      "reason": "11 files, 11 total changes (avg 1.0/file) — stable, rarely modified code."
+      "file_count": 8,
+      "reason": "8 files, 11 total changes (avg 1.4/file) — stable, rarely modified code."
+    },
+    {
+      "path": "Valence_ext",
+      "total_changes": 16,
+      "file_count": 16,
+      "reason": "16 files, 16 total changes (avg 1.0/file) — stable, rarely modified code."
     }
   ],
   "warnings": [],
   "suggestions": [
-    "Split 'lib/app/router.dart' into smaller focused modules — 639 lines and 39 modifications make it the biggest maintenance burden in the repo.",
-    "Prioritize code review for 'lib/app/router.dart' and 'pubspec.yaml' — they carry the highest risk scores and are the most likely sources of future bugs."
+    "Split 'pubspec.lock' into smaller focused modules — 1,378 lines and 37 modifications make it the biggest maintenance burden in the repo.",
+    "Prioritize code review for 'pubspec.lock' and 'lib/app/router.dart' — they carry the highest risk scores and are the most likely sources of future bugs."
   ],
-  "total_files": 644,
-  "total_changes": 2142,
+  "total_files": 716,
+  "total_changes": 2251,
   "repo": "numa-mobile-develop"
 }

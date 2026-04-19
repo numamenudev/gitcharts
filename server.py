@@ -153,26 +153,43 @@ def regenerate_repo(repo_name, config, granularity, branch="", save_as=""):
         raise RuntimeError(f"archaeology exited {proc.returncode}")
 
 
-def get_develop_branch(config):
-    """Find the develop branch (develop, development, dev) for this repo."""
-    import re
+_BRANCH_CACHE = {}
+
+
+def list_remote_branches(config):
+    """Return sorted list of all remote branches. Cached per URL for ~10 min."""
+    url = config["url"]
+    now = time.time()
+    entry = _BRANCH_CACHE.get(url)
+    if entry and now - entry[0] < 600:
+        return entry[1]
     result = subprocess.run(
-        ["git", "ls-remote", "--heads", config["url"]],
+        ["git", "ls-remote", "--heads", url],
         capture_output=True, text=True, timeout=30,
     )
     if result.returncode != 0:
-        return None
-    # Extract branch names from refs/heads/...
-    branches = re.findall(r"refs/heads/(\S+)", result.stdout)
-    # Priority order: develop > development > dev
+        return []
+    branches = sorted(set(re.findall(r"refs/heads/(\S+)", result.stdout)))
+    _BRANCH_CACHE[url] = (now, branches)
+    return branches
+
+
+def get_develop_branch(config):
+    """Find the develop branch (develop, development, dev) for this repo."""
+    branches = list_remote_branches(config)
     for candidate in ("develop", "development", "dev"):
         if candidate in branches:
             return candidate
     return None
 
 
-def regenerate_single(repo_name, granularity, path_prefix="", timeline=0, skip_archaeology=False, timeline_granularity="snapshot"):
-    """Regenerate a single repo (main + develop if exists) in background."""
+def sanitize_branch_label(branch):
+    """Turn a branch name into a filename-safe suffix."""
+    return re.sub(r"[^a-zA-Z0-9._-]+", "-", branch).strip("-") or "branch"
+
+
+def regenerate_single(repo_name, granularity, path_prefix="", timeline=0, skip_archaeology=False, timeline_granularity="snapshot", branch=""):
+    """Regenerate a single repo. If branch is set, run only that branch; else run main + develop if exists."""
     global status
     status = {
         "running": True, "repo": repo_name, "progress": "", "error": None,
@@ -200,27 +217,39 @@ def regenerate_single(repo_name, granularity, path_prefix="", timeline=0, skip_a
 
         config = repos[repo_name]
 
-        # Check develop presence now to tighten plan
-        dev_branch = get_develop_branch(config)
-        if not dev_branch:
+        if branch:
+            # Custom-branch mode: only run the one requested branch
             _global_plan["total_weight"] = per_branch
-
-        # Main branch
-        status["progress"] = "main"
-        if status.get("cancelled"): return
-        if not skip_archaeology and not path_prefix:
-            regenerate_repo(repo_name, config, granularity)
-        if status.get("cancelled"): return
-        run_hotspot(repo_name, config, path_prefix=path_prefix, timeline=timeline, timeline_granularity=timeline_granularity)
-
-        if dev_branch and not status.get("cancelled"):
-            status["progress"] = "develop"
-            if not skip_archaeology and not path_prefix:
-                regenerate_repo(repo_name, config, granularity, branch=dev_branch, save_as="develop")
+            label = sanitize_branch_label(branch)
+            status["progress"] = branch
             if status.get("cancelled"): return
-            run_hotspot(repo_name, config, branch=dev_branch, save_as="develop",
+            if not skip_archaeology and not path_prefix:
+                regenerate_repo(repo_name, config, granularity, branch=branch, save_as=label)
+            if status.get("cancelled"): return
+            run_hotspot(repo_name, config, branch=branch, save_as=label,
                         path_prefix=path_prefix, timeline=timeline,
                         timeline_granularity=timeline_granularity)
+        else:
+            # Legacy main + develop pair
+            dev_branch = get_develop_branch(config)
+            if not dev_branch:
+                _global_plan["total_weight"] = per_branch
+
+            status["progress"] = "main"
+            if status.get("cancelled"): return
+            if not skip_archaeology and not path_prefix:
+                regenerate_repo(repo_name, config, granularity)
+            if status.get("cancelled"): return
+            run_hotspot(repo_name, config, path_prefix=path_prefix, timeline=timeline, timeline_granularity=timeline_granularity)
+
+            if dev_branch and not status.get("cancelled"):
+                status["progress"] = "develop"
+                if not skip_archaeology and not path_prefix:
+                    regenerate_repo(repo_name, config, granularity, branch=dev_branch, save_as="develop")
+                if status.get("cancelled"): return
+                run_hotspot(repo_name, config, branch=dev_branch, save_as="develop",
+                            path_prefix=path_prefix, timeline=timeline,
+                            timeline_granularity=timeline_granularity)
 
         subprocess.run(
             ["uv", "run", "python", "generate_repos_list.py"],
@@ -274,6 +303,21 @@ class Handler(SimpleHTTPRequestHandler):
         elif self.path == "/api/config":
             with open(CONFIG_PATH) as f:
                 self._json_response(json.load(f))
+        elif self.path.startswith("/api/branches"):
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            repo_name = (qs.get("repo") or [""])[0]
+            if not repo_name:
+                self._json_response({"error": "missing repo"}, code=400)
+                return
+            with open(CONFIG_PATH) as f:
+                repos = json.load(f)
+            config = repos.get(repo_name)
+            if not config:
+                self._json_response({"error": "unknown repo"}, code=404)
+                return
+            branches = list_remote_branches(config)
+            self._json_response({"branches": branches})
         else:
             super().do_GET()
 
@@ -302,10 +346,11 @@ class Handler(SimpleHTTPRequestHandler):
             path_prefix = body.get("path_prefix", "")
             timeline = int(body.get("timeline", 0) or 0)
             timeline_granularity = body.get("timeline_granularity", "snapshot")
+            branch = body.get("branch", "")
 
             if repo:
                 target = regenerate_single
-                args = (repo, granularity, path_prefix, timeline, bool(path_prefix), timeline_granularity)
+                args = (repo, granularity, path_prefix, timeline, bool(path_prefix), timeline_granularity, branch)
             else:
                 target = regenerate_all
                 args = (granularity,)

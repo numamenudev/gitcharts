@@ -1,4 +1,5 @@
-import { renderCity, disposeCity, updateCityMetrics, setAutoRotate, buildLayoutMap } from "./city.js";
+import { renderCity, disposeCity, updateCityMetrics, setAutoRotate, buildLayoutMap, sampleRiskGradient } from "./city.js";
+import { renderCompare, disposeCompare } from "./compare.js";
 
 // Application State
 const state = {
@@ -67,6 +68,9 @@ function parseURL() {
     const view = availableVariants.includes("hotspot") ? segment : "archaeology";
     return { repo: validRepo, variant: "clean", view };
   }
+  if (segment === "compare") {
+    return { repo: validRepo, variant: "clean", view: "compare" };
+  }
 
   const validVariant = availableVariants.includes(segment) ? segment : "clean";
   return { repo: validRepo, variant: validVariant, view: "archaeology" };
@@ -79,6 +83,7 @@ function updateURL() {
   let segment;
   if (state.currentView === "hotspot") segment = "hotspot";
   else if (state.currentView === "city") segment = "city";
+  else if (state.currentView === "compare") segment = "compare";
   else segment = state.currentVariant;
   const hash = `#${state.currentRepo}/${segment}`;
   if (window.location.hash !== hash) {
@@ -95,7 +100,30 @@ function hasHotspotDevelop(repo) {
 }
 
 function hotspotVariantKey() {
-  return state.hotspotBranch === "develop" ? "develop-hotspot" : "hotspot";
+  if (state.hotspotBranch === "develop") return "develop-hotspot";
+  if (state.hotspotBranch && state.hotspotBranch !== "main") {
+    return `${state.hotspotBranch}-hotspot`;
+  }
+  return "hotspot";
+}
+
+function hotspotBranchSuffix() {
+  if (state.hotspotBranch === "develop") return "-develop";
+  if (state.hotspotBranch && state.hotspotBranch !== "main") return `-${state.hotspotBranch}`;
+  return "";
+}
+
+function availableHotspotBranches(repo) {
+  const vs = state.repos[repo] || [];
+  const out = [];
+  if (vs.includes("hotspot")) out.push("main");
+  if (vs.includes("hotspot-develop")) out.push("develop");
+  for (const v of vs) {
+    if (v.startsWith("hotspot-") && v !== "hotspot-develop") {
+      out.push(v.slice("hotspot-".length));
+    }
+  }
+  return out;
 }
 
 // ========================================
@@ -388,7 +416,7 @@ async function updateArchaeology() {
 }
 
 async function loadInsights(repo) {
-  const suffix = state.hotspotBranch === "develop" ? "-develop" : "";
+  const suffix = hotspotBranchSuffix();
   try {
     const res = await fetch(`charts/${repo}${suffix}-insights.json?t=${Date.now()}`);
     if (!res.ok) return null;
@@ -443,16 +471,28 @@ function populateScopeDropdown(spec) {
 
 function populateBranchDropdown() {
   const sel = document.getElementById("hotspot-branch");
-  const hasDev = hasHotspotDevelop(state.currentRepo);
   sel.innerHTML = "";
   const addOpt = (v, label) => {
     const o = document.createElement("option");
     o.value = v; o.textContent = label;
     sel.appendChild(o);
   };
-  addOpt("main", "main");
-  if (hasDev) addOpt("develop", "develop");
+  const branches = availableHotspotBranches(state.currentRepo);
+  if (branches.length === 0) branches.push("main");
+  for (const b of branches) addOpt(b, b);
+  if (!branches.includes(state.hotspotBranch)) {
+    state.hotspotBranch = branches[0];
+  }
   sel.value = state.hotspotBranch;
+}
+
+function scopeFilterNodes(nodes, scope) {
+  if (!scope || scope === "all") return nodes;
+  return nodes.filter(n =>
+    n.id === "root" ||
+    n.id === scope ||
+    n.id.startsWith(scope + "/")
+  );
 }
 
 function filterSpecByScope(spec, scope) {
@@ -476,28 +516,67 @@ function escapeHTML(s) {
 
 function buildRiskBands(scores) {
   if (!scores || scores.length === 0) return null;
-  const sorted = scores.slice().sort((a, b) => a - b);
-  const pct = p => sorted[Math.max(0, Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * p)))];
+  const max = Math.max(...scores);
   const fmt = v => v < 10 ? v.toFixed(1) : Math.round(v).toString();
-  return {
-    p50: pct(0.5), p75: pct(0.75), p90: pct(0.9), max: sorted[sorted.length - 1],
-    fmt,
-  };
+  return { max: max || 1, fmt };
+}
+
+function cityReadingGuideHTML() {
+  const rows = [
+    ["Tall + wide + red",      "Big file touched often — classic critical hotspot",            "Split / refactor priority"],
+    ["Narrow + tall + red",    "Small file churned constantly (bootstrap, routing, config)",   "Often OK; watch if it grows"],
+    ["Wide + short + green",   "Big stable file (DTO, constants, migration)",                  "Ignore"],
+    ["Yellow / orange wide",   "Mid-size file touched moderately",                             "Monitor"],
+    ["Small + green",          "Small untouched file (utility, enum, interface)",              "Healthy"],
+    ["Smoke on roof",          "One of the top 5 risk-score files in the repo",                "Look here first"],
+    ["Overcast / storm sky",   "High gravity: many concentrated hotspots",                     "Significant debt in repo"],
+  ];
+  const body = rows.map(r => `
+    <tr>
+      <td class="fw-semibold" style="white-space:nowrap">${r[0]}</td>
+      <td>${r[1]}</td>
+      <td class="text-body-secondary">${r[2]}</td>
+    </tr>
+  `).join("");
+  return `
+    <div class="mt-3 pt-2 border-top">
+      <div class="fw-semibold mb-2 text-body">How to read the city</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-borderless mb-1" style="font-size:0.82rem">
+          <thead class="text-body-secondary">
+            <tr><th>What you see</th><th>Meaning</th><th>Action</th></tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+      <div class="text-body-secondary" style="font-size:0.78rem">
+        Rule of thumb: same height &rarr; redder = more urgent. Same color &rarr; taller + wider = bigger refactor payoff.
+      </div>
+    </div>
+  `;
 }
 
 function riskBandHTML(b) {
   if (!b) return "";
-  const { p50, p75, p90, max, fmt } = b;
+  const { max, fmt } = b;
+  // Bands aligned to the city's linear gradient stops (quartiles of max score).
+  // Color chips sampled from the exact same gradient the city renders.
+  const stops = [
+    { lo: 0,         hi: max * 0.25, label: "Stable, rarely touched",  mid: 0.125 },
+    { lo: max*0.25,  hi: max * 0.5,  label: "Low risk",                mid: 0.375 },
+    { lo: max*0.5,   hi: max * 0.75, label: "Elevated — watch it",     mid: 0.625 },
+    { lo: max*0.75,  hi: max,        label: "Critical hotspot",        mid: 0.9  },
+  ];
+  const chips = stops.map(s => {
+    const col = sampleRiskGradient(s.mid);
+    const dark = s.mid > 0.5;
+    return `<span><span class="badge" style="background:${col};${dark ? "" : "color:#222"}">${fmt(s.lo)} – ${fmt(s.hi)}</span> ${s.label}</span>`;
+  }).join("");
   return `
     <div class="mt-2 pt-2 border-top">
       <div class="fw-semibold mb-1 text-body">Risk score ranges <small class="text-body-secondary fw-normal">(this repository)</small></div>
-      <div class="d-flex flex-wrap gap-2" style="font-size:0.82rem">
-        <span><span class="badge" style="background:#1a9641">0 – ${fmt(p50)}</span> Stable, rarely touched</span>
-        <span><span class="badge" style="background:#a6d96a;color:#222">${fmt(p50)} – ${fmt(p75)}</span> Low risk</span>
-        <span><span class="badge" style="background:#fdae61;color:#222">${fmt(p75)} – ${fmt(p90)}</span> Elevated — watch it</span>
-        <span><span class="badge" style="background:#d7191c">${fmt(p90)} – ${fmt(max)}</span> Critical hotspot</span>
-      </div>
-      <div class="text-body-secondary mt-1" style="font-size:0.78rem">Bands split at median, 75th, and 90th percentiles of this repo's file scores.</div>
+      <div class="d-flex flex-wrap gap-2" style="font-size:0.82rem">${chips}</div>
+      <div class="text-body-secondary mt-1" style="font-size:0.78rem">Bands split by quartile of max score — color chip shows the exact gradient tone in the 3D city at that range.</div>
     </div>
   `;
 }
@@ -521,7 +600,8 @@ function renderInsights(insights, riskScores) {
         <strong>Size</strong> = lines of code (LOC). Bigger rectangle = bigger file.<br>
         <strong>Color</strong> = risk score (changes &times; log LOC). <span class="text-danger fw-semibold">Red</span> = high change frequency &amp; large file = likely technical debt. <span class="text-success fw-semibold">Green</span> = stable or small.
       `;
-    legend.innerHTML = base + riskBandHTML(bands);
+    const readingGuide = state.currentView === "city" ? cityReadingGuideHTML() : "";
+    legend.innerHTML = base + riskBandHTML(bands) + readingGuide;
   }
 
   const hotspotsEl = document.getElementById("insights-hotspots");
@@ -633,14 +713,15 @@ async function loadTimeline() {
   const row = document.getElementById("timeline-row");
   row.style.display = "none";
 
-  const suffix = state.hotspotBranch === "develop" ? "-develop" : "";
+  const suffix = hotspotBranchSuffix();
   try {
     const res = await fetch(`charts/${state.currentRepo}${suffix}-timeline.json?t=${Date.now()}`);
-    if (!res.ok) return;
+    if (!res.ok) return false;
     const data = await res.json();
-    if (!data.snapshots || data.snapshots.length === 0) return;
-    // Build stable master layout from union of all snapshots
-    const masterNodes = buildUnionMasterNodes(data.snapshots);
+    if (!data.snapshots || data.snapshots.length === 0) return false;
+    // Build stable master layout from union of all snapshots, then apply current scope
+    const fullMasterNodes = buildUnionMasterNodes(data.snapshots);
+    const masterNodes = scopeFilterNodes(fullMasterNodes, state.hotspotScope);
     const layoutMap = buildLayoutMap(masterNodes);
     state.timeline = {
       snapshots: data.snapshots,
@@ -648,6 +729,7 @@ async function loadTimeline() {
       playing: false, playTimer: null,
       masterNodes,
       layoutMap,
+      scope: state.hotspotScope,
     };
     const slider = document.getElementById("timeline-slider");
     slider.min = 0;
@@ -668,24 +750,37 @@ async function loadTimeline() {
         scope: state.hotspotScope,
       }, { layoutMap });
       // Apply initial snapshot metrics
-      updateCityMetrics(snapshotMetricsMap(data.snapshots[state.timeline.index]));
+      updateCityMetrics(snapshotMetricsMap(data.snapshots[state.timeline.index]), { immediate: true });
+      return true;
     }
-  } catch {}
+    return false;
+  } catch { return false; }
 }
 
 function updateTimelineLabel() {
   if (!state.timeline) return;
   const s = state.timeline.snapshots[state.timeline.index];
   const el = document.getElementById("timeline-label");
-  el.textContent = `${s.date} — ${s.file_count} files, ${s.total_changes} changes`;
+  const scope = state.hotspotScope;
+  const pos = `${state.timeline.index + 1}/${state.timeline.snapshots.length}`;
+  if (scope && scope !== "all") {
+    const inScope = s.nodes.filter(n =>
+      n.id === scope || n.id.startsWith(scope + "/"),
+    );
+    const files = inScope.filter(n => (n.loc || 0) > 0 || (n.changes || 0) > 0).length;
+    const changes = inScope.reduce((acc, n) => acc + (n.changes || 0), 0);
+    el.textContent = `[${pos}] ${s.date} — ${files} files, ${changes} changes (scope: ${scope})`;
+  } else {
+    el.textContent = `[${pos}] ${s.date} — ${s.file_count} files, ${s.total_changes} changes`;
+  }
 }
 
-function applyTimelineSnapshot() {
+function applyTimelineSnapshot(opts = {}) {
   if (!state.timeline) return;
   const snap = state.timeline.snapshots[state.timeline.index];
   if (state.currentView === "city") {
     // Fast path: update existing buildings in-place (preserves camera + positions)
-    updateCityMetrics(snapshotMetricsMap(snap));
+    updateCityMetrics(snapshotMetricsMap(snap), opts);
   } else {
     // 2D treemap: positions will still shift (Vega recomputes) — acceptable for now
     const baseSpec = state.loadedCharts[`${state.currentRepo}-${hotspotVariantKey()}`];
@@ -706,7 +801,8 @@ function applyTimelineSnapshot() {
 function onTimelineSliderInput(e) {
   if (!state.timeline) return;
   state.timeline.index = parseInt(e.target.value);
-  applyTimelineSnapshot();
+  // Slider drag: snap immediately (user is scrubbing fast, tween would lag behind)
+  applyTimelineSnapshot({ immediate: true });
 }
 
 function onTimelinePlayToggle() {
@@ -723,7 +819,7 @@ function onTimelinePlayToggle() {
   if (state.timeline.index >= state.timeline.snapshots.length - 1) {
     state.timeline.index = 0;
     document.getElementById("timeline-slider").value = 0;
-    applyTimelineSnapshot();
+    applyTimelineSnapshot({ immediate: true });
   }
   state.timeline.playing = true;
   btn.innerHTML = "&#10074;&#10074;";
@@ -740,8 +836,8 @@ function onTimelinePlayToggle() {
     }
     state.timeline.index = next;
     document.getElementById("timeline-slider").value = next;
-    applyTimelineSnapshot();
-  }, 600);
+    applyTimelineSnapshot({ tweenMs: 1600 });
+  }, 1300);
 }
 
 async function updateCity() {
@@ -752,14 +848,19 @@ async function updateCity() {
     const scopedSpec = filterSpecByScope(spec, state.hotspotScope);
     chartContainer.innerHTML = "";
     chartContainer.className = "";
-    renderCity(scopedSpec, chartContainer, {
-      repo: state.currentRepo,
-      branch: state.hotspotBranch,
-      scope: state.hotspotScope,
-    });
+    // Try timeline first; it will render the master layout and apply the latest
+    // snapshot in one shot (no double-render flash). Fallback to static spec if
+    // this repo has no timeline file.
+    const didRender = await loadTimeline();
+    if (!didRender) {
+      renderCity(scopedSpec, chartContainer, {
+        repo: state.currentRepo,
+        branch: state.hotspotBranch,
+        scope: state.hotspotScope,
+      });
+    }
     const insights = await loadInsights(state.currentRepo);
     renderInsights(insights, extractScopedRiskScores(scopedSpec));
-    await loadTimeline();
   } catch (error) {
     console.error(error);
     showError(state.currentRepo, hotspotVariantKey());
@@ -768,17 +869,41 @@ async function updateCity() {
 }
 
 async function updateChart() {
-  // Dispose previous city renderer if leaving city view
-  if (state.currentView !== "city") {
-    disposeCity();
-  }
+  // Dispose previous city/compare renderer if leaving those views
+  if (state.currentView !== "city") disposeCity();
+  if (state.currentView !== "compare") disposeCompare();
   if (state.currentView === "hotspot") {
     await updateHotspot();
   } else if (state.currentView === "city") {
     await updateCity();
+  } else if (state.currentView === "compare") {
+    await updateCompare();
   } else {
     document.getElementById("insights-panel").style.display = "none";
     await updateArchaeology();
+  }
+}
+
+async function updateCompare() {
+  showLoading();
+  try {
+    const branches = availableHotspotBranches(state.currentRepo);
+    if (branches.length < 2) {
+      chartContainer.innerHTML = '<p class="text-muted">Compare needs at least two branches (main + develop). Regenerate another branch first.</p>';
+      document.getElementById("insights-panel").style.display = "none";
+      return;
+    }
+    const specMain = await loadChart(state.currentRepo, "hotspot");
+    const second = branches.find(b => b !== "main") || "develop";
+    const devKey = second === "develop" ? "develop-hotspot" : `${second}-hotspot`;
+    const specDev = await loadChart(state.currentRepo, devKey);
+    chartContainer.innerHTML = "";
+    chartContainer.className = "";
+    renderCompare(chartContainer, specMain, specDev);
+    document.getElementById("insights-panel").style.display = "none";
+  } catch (error) {
+    console.error(error);
+    showError(state.currentRepo, "compare");
   }
 }
 
@@ -814,14 +939,23 @@ function updateViewControls() {
   const btnArch = document.getElementById("view-btn-archaeology");
   const btnHot = document.getElementById("view-btn-hotspot");
   const btnCity = document.getElementById("view-btn-city");
+  const btnCompare = document.getElementById("view-btn-compare");
+  const compareAvailable = availableHotspotBranches(state.currentRepo).length >= 2;
 
-  // If hotspot/city view requested but not available, fallback to archaeology
+  // If hotspot/city/compare view requested but not available, fallback
   if ((state.currentView === "hotspot" || state.currentView === "city") && !hotspotAvailable) {
+    state.currentView = "archaeology";
+  }
+  if (state.currentView === "compare" && !compareAvailable) {
     state.currentView = "archaeology";
   }
 
   btnHot.disabled = !hotspotAvailable;
   btnCity.disabled = !hotspotAvailable;
+  if (btnCompare) {
+    btnCompare.disabled = !compareAvailable;
+    btnCompare.title = compareAvailable ? "" : "Compare needs at least two branches generated";
+  }
   const title = hotspotAvailable ? "" : "No hotspot data — regenerate this repo first";
   btnHot.title = title;
   btnCity.title = title;
@@ -829,8 +963,9 @@ function updateViewControls() {
   btnArch.classList.toggle("active", state.currentView === "archaeology");
   btnHot.classList.toggle("active", state.currentView === "hotspot");
   btnCity.classList.toggle("active", state.currentView === "city");
+  if (btnCompare) btnCompare.classList.toggle("active", state.currentView === "compare");
 
-  const isHotspotLike = state.currentView === "hotspot" || state.currentView === "city";
+  const isHotspotLike = state.currentView === "hotspot" || state.currentView === "city" || state.currentView === "compare";
   document.querySelectorAll(".archaeology-only").forEach(el => {
     el.style.display = isHotspotLike ? "none" : "";
   });
@@ -853,6 +988,7 @@ function updateViewControls() {
 function onViewChange(view) {
   if (view === state.currentView) return;
   if ((view === "hotspot" || view === "city") && !hasHotspot(state.currentRepo)) return;
+  if (view === "compare" && availableHotspotBranches(state.currentRepo).length < 2) return;
   state.currentView = view;
   updateViewControls();
   updateURL();
@@ -1030,6 +1166,8 @@ async function init() {
     .addEventListener("click", () => onViewChange("hotspot"));
   document.getElementById("view-btn-city")
     .addEventListener("click", () => onViewChange("city"));
+  const cmpBtn = document.getElementById("view-btn-compare");
+  if (cmpBtn) cmpBtn.addEventListener("click", () => onViewChange("compare"));
   document.getElementById("timeline-slider")
     .addEventListener("input", onTimelineSliderInput);
   document.getElementById("timeline-play-btn")
@@ -1059,8 +1197,21 @@ function onRegenerate() {
   document.getElementById("regen-path-prefix").value = "";
   document.getElementById("regen-timeline").value = "0";
   document.getElementById("regen-timeline-granularity").value = "snapshot";
+  const branchSel = document.getElementById("regen-branch");
+  branchSel.innerHTML = '<option value="">auto (main + develop)</option><option value="" disabled>loading…</option>';
   toggleTimelineCountRow();
   regenerateModal.show();
+  // Populate available branches async
+  fetch(`/api/branches?repo=${encodeURIComponent(state.currentRepo)}`)
+    .then(r => r.json())
+    .then(d => {
+      const branches = d.branches || [];
+      branchSel.innerHTML = '<option value="">auto (main + develop)</option>' +
+        branches.map(b => `<option value="${b}">${b}</option>`).join("");
+    })
+    .catch(() => {
+      branchSel.innerHTML = '<option value="">auto (main + develop)</option>';
+    });
 }
 
 function toggleTimelineCountRow() {
@@ -1092,6 +1243,7 @@ async function runRegenerate() {
         path_prefix: pathPrefix,
         timeline,
         timeline_granularity: tlGran,
+        branch: document.getElementById("regen-branch").value || "",
       }),
     });
     const data = await res.json();

@@ -4,5 +4,27 @@ __pycache__/
 repo-cache
 git-research
 .playwright-mcp/
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Screenshots / scratch artifacts (root-level)
+/*.jpg
+/*.jpeg
 city-*.png
 hotspot-*.png
+compare-*.png
+folder-*.png
+scoped-*.png
+tour-*.png
+padding-*.png
+post-revert.png
+revert*.png
+tests-*.png
+tornhill*.png
+bands-*.png
+all-files.png
+reading-guide.png
+curb-fix.png

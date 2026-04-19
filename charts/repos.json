@@ -19,6 +19,7 @@
     "clean",
     "versioned"
   ],
+  "linkedin-b2b": [],
   "marimo": [
     "clean",
     "versioned"
@@ -33,18 +34,20 @@
   ],
   "numa-backend": [
     "clean",
-    "versioned",
+    "hotspot-develop",
     "hotspot",
-    "hotspot-develop"
+    "versioned"
   ],
   "numa-mobile": [
-    "hotspot",
-    "hotspot-develop"
+    "hotspot-develop",
+    "hotspot"
   ],
+  "numa-showcase": [],
   "python-diskcache": [
     "clean",
     "versioned"
   ],
+  "rag-demo": [],
   "scikit-learn": [
     "clean",
     "versioned"

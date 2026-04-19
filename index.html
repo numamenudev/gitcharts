@@ -59,6 +59,7 @@
                         <button id="view-btn-archaeology" data-view="archaeology" class="btn btn-outline-secondary active">Archaeology</button>
                         <button id="view-btn-hotspot" data-view="hotspot" class="btn btn-outline-secondary">Hotspot</button>
                         <button id="view-btn-city" data-view="city" class="btn btn-outline-secondary">City (3D)</button>
+                        <button id="view-btn-compare" data-view="compare" class="btn btn-outline-secondary">Compare</button>
                     </div>
                     <button data-testid="regenerate-btn" id="regenerate-btn" class="btn btn-primary btn-sm">
                         Regenerate
@@ -90,6 +91,13 @@
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label small">Branch</label>
+                                <select id="regen-branch" class="form-select form-select-sm">
+                                    <option value="">auto (main + develop)</option>
+                                </select>
+                                <div class="form-text">Pick a specific remote branch, or leave on auto to process main and develop together.</div>
+                            </div>
                             <div class="mb-3">
                                 <label class="form-label small">Path scope (optional)</label>
                                 <input type="text" id="regen-path-prefix" class="form-control form-control-sm"
