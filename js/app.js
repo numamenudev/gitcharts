@@ -719,9 +719,23 @@ async function loadTimeline() {
     if (!res.ok) return false;
     const data = await res.json();
     if (!data.snapshots || data.snapshots.length === 0) return false;
-    // Build stable master layout from union of all snapshots, then apply current scope
+    // Build stable master layout from union of all snapshots, prune files that
+    // are dead in the latest snapshot (renamed / deleted), then apply scope.
     const fullMasterNodes = buildUnionMasterNodes(data.snapshots);
-    const masterNodes = scopeFilterNodes(fullMasterNodes, state.hotspotScope);
+    const latest = data.snapshots[data.snapshots.length - 1];
+    const liveIds = new Set(
+      (latest.nodes || [])
+        .filter(n => (n.loc || 0) > 0 || (n.changes || 0) > 0)
+        .map(n => n.id)
+    );
+    const pruned = fullMasterNodes.filter(n => {
+      if (n.id === "root") return true;
+      // A node survives if it's a live leaf OR a folder with a live descendant
+      if (liveIds.has(n.id)) return true;
+      for (const id of liveIds) if (id.startsWith(n.id + "/")) return true;
+      return false;
+    });
+    const masterNodes = scopeFilterNodes(pruned, state.hotspotScope);
     const layoutMap = buildLayoutMap(masterNodes);
     state.timeline = {
       snapshots: data.snapshots,

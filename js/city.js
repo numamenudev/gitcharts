@@ -497,7 +497,7 @@ export function updateCityMetrics(metricsById, opts = {}) {
     const targetColor = new THREE.Color();
     if (m) {
       const loc = m.loc || 0;
-      const h = Math.max(1, Math.sqrt(loc / maxLoc) * MAX_HEIGHT);
+      const h = Math.max(2, Math.sqrt(loc / maxLoc) * MAX_HEIGHT);
       targetScaleY = h / b.mesh.userData._initH;
       targetVisible = loc > 0 || (m.changes || 0) > 0;
       targetColor.copy(_colorForScore(m.hotspot_score || 0, bands));
@@ -679,7 +679,7 @@ export function renderCity(spec, container, meta = {}, opts = {}) {
     }),
   );
   coreGround.rotation.x = -Math.PI / 2;
-  coreGround.position.y = -0.02;
+  coreGround.position.y = -0.5;
   coreGround.receiveShadow = true;
   scene.add(coreGround);
 
@@ -703,7 +703,11 @@ export function renderCity(spec, container, meta = {}, opts = {}) {
   // Buildings sit flush on the ground — no tiered platform base.
   const maxTier = 0;
 
-  const LINE_BASE = 0x5c636d;     // folder-line base color (dark grey)
+  // Folder areas as FLAT filled tiles on the ground. Darker for shallow
+  // folders, fading toward the asphalt tone for deeper (smaller) inner
+  // folders so nested tiles blend into the background.
+  const ASPHALT = new THREE.Color(0x8b9098);
+  const DARK    = new THREE.Color(0x3e444d);
   internalNodes.sort((a, b) => a.depth - b.depth);
   for (const n of internalNodes) {
     const w = n.x1 - n.x0;
@@ -711,25 +715,23 @@ export function renderCity(spec, container, meta = {}, opts = {}) {
     if (w < 0.6 || depth < 0.6) continue;
     const cx = n.x0 + w / 2 - WORLD_SIZE / 2;
     const cz = n.y0 + depth / 2 - WORLD_SIZE / 2;
-    // Fade line toward the asphalt tone as depth grows (inner folders fade out)
-    const fade = Math.min(0.75, 0.15 + n.depth * 0.18);
-    const lineCol = new THREE.Color(LINE_BASE).lerp(new THREE.Color(0x8b9098), fade);
-    const lineMat = new THREE.LineBasicMaterial({
-      color: lineCol,
+    const tier = Math.max(0, n.depth - 1);
+    // Lerp dark → asphalt as tiers grow; opacity also drops with depth
+    const tFade = Math.min(1, tier / 4);
+    const color = DARK.clone().lerp(ASPHALT, 0.3 + tFade * 0.6);
+    const opacity = Math.max(0.18, 0.72 - tier * 0.14);
+    const mat = new THREE.MeshBasicMaterial({
+      color,
       transparent: true,
-      opacity: Math.max(0.25, 0.75 - n.depth * 0.12),
+      opacity,
+      depthWrite: false,
     });
-    const hx = w / 2, hz = depth / 2;
-    const pts = [
-      new THREE.Vector3(cx - hx, 0.01, cz - hz),
-      new THREE.Vector3(cx + hx, 0.01, cz - hz),
-      new THREE.Vector3(cx + hx, 0.01, cz + hz),
-      new THREE.Vector3(cx - hx, 0.01, cz + hz),
-      new THREE.Vector3(cx - hx, 0.01, cz - hz),
-    ];
-    const geom = new THREE.BufferGeometry().setFromPoints(pts);
-    const line = new THREE.Line(geom, lineMat);
-    scene.add(line);
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, depth), mat);
+    plane.rotation.x = -Math.PI / 2;
+    // Slight stacking offset so inner tiles sit visually above outer ones
+    plane.position.set(cx, 0.02 + tier * 0.01, cz);
+    plane.renderOrder = 1 + tier;
+    scene.add(plane);
   }
 
   // Buildings (leaf files)
@@ -742,7 +744,7 @@ export function renderCity(spec, container, meta = {}, opts = {}) {
 
     const loc = leaf.data.loc || 0;
     // Height: sqrt-scaled so huge files don't dominate
-    const h = Math.max(1, Math.sqrt(loc / maxLoc) * MAX_HEIGHT);
+    const h = Math.max(2, Math.sqrt(loc / maxLoc) * MAX_HEIGHT);
 
     const color = colorForScore(leaf.data.hotspot_score || 0, renderBands);
 
@@ -931,6 +933,10 @@ export function renderCity(spec, container, meta = {}, opts = {}) {
   }
 
   // Controls
+  // DEBUG: expose scene / buildings for diagnostic counting
+  if (typeof window !== "undefined") {
+    window.__cityDebug = { scene, buildings, camera, controls: null };
+  }
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
