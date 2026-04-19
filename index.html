@@ -171,6 +171,13 @@
             <div id="timeline-row" class="hotspot-only mt-3" style="display:none;">
                 <div class="d-flex align-items-center gap-2">
                     <button id="timeline-play-btn" class="btn btn-outline-secondary btn-sm" title="Play timeline">&#9658;</button>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Playback speed">
+                        <button type="button" class="btn btn-outline-secondary timeline-speed-btn" data-speed="1">1x</button>
+                        <button type="button" class="btn btn-outline-secondary timeline-speed-btn" data-speed="1.5">1.5x</button>
+                        <button type="button" class="btn btn-outline-secondary timeline-speed-btn" data-speed="2">2x</button>
+                        <button type="button" class="btn btn-outline-secondary timeline-speed-btn" data-speed="3">3x</button>
+                        <button type="button" class="btn btn-outline-secondary timeline-speed-btn" data-speed="4">4x</button>
+                    </div>
                     <input type="range" id="timeline-slider" class="form-range flex-grow-1" min="0" max="0" value="0">
                     <span id="timeline-label" class="small text-muted" style="min-width: 180px; text-align: right;"></span>
                 </div>

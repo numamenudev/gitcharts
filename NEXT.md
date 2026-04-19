@@ -1,5 +1,13 @@
 # GitCharts — Backlog prossima sessione
 
+## 0. Fix Compare view (PRIORITÀ)
+- Compare view (`js/compare.js`) non funziona correttamente
+- Ripartire dalla sessione del 2026-04-19 dove abbiamo applicato prune master
+  layout (exclude file morti nell'ultimo snapshot) in `app.js` loadTimeline
+- Controllare: ghost footprints, sync camera bidirezionale, auto-fit framing,
+  consistenza con il nuovo master pruning
+- Probabile: compare.js non usa il pruning → mostra ancora fantasmi
+
 ## 1. Branch picker da git
 - Leggere lista branch remoti via `git ls-remote --heads <url>` (già esiste helper
   `get_develop_branch` in `server.py`: riusare + generalizzare)

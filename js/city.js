@@ -86,8 +86,8 @@ function _buildWeather(sceneRef, sunRef, rimRef, hemiRef, initialGravity) {
     cloudTex: _createCloudTexture(),
     preset,
   };
-  // Clouds: billboard sprites (always face the camera, no rect edges visible)
-  for (let i = 0; i < 14; i++) {
+  // Clouds disabled — visible as blobs when zooming out, more noise than signal.
+  for (let i = 0; i < 0; i++) {
     const sz = 55 + Math.random() * 75;
     const sMat = new THREE.SpriteMaterial({
       map: w.cloudTex,

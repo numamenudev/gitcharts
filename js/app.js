@@ -12,6 +12,7 @@ const state = {
   invertLayers: false,
   loadedCharts: {}, // Cache: {repo-variant: vegaSpec}
   timeline: null, // { snapshots: [...], index: 0, playing: false, playTimer: null }
+  playbackSpeed: 1,
 };
 
 // DOM Elements
@@ -850,8 +851,21 @@ function onTimelinePlayToggle() {
     }
     state.timeline.index = next;
     document.getElementById("timeline-slider").value = next;
-    applyTimelineSnapshot({ tweenMs: 1600 });
-  }, 1300);
+    applyTimelineSnapshot({ tweenMs: 1600 / state.playbackSpeed });
+  }, 1300 / state.playbackSpeed);
+}
+
+function setPlaybackSpeed(speed) {
+  state.playbackSpeed = speed;
+  document.querySelectorAll(".timeline-speed-btn").forEach(b => {
+    b.classList.toggle("active", parseFloat(b.dataset.speed) === speed);
+  });
+  // Restart interval with new speed if currently playing
+  if (state.timeline?.playing) {
+    clearInterval(state.timeline.playTimer);
+    state.timeline.playing = false;
+    onTimelinePlayToggle();
+  }
 }
 
 async function updateCity() {
@@ -1186,6 +1200,10 @@ async function init() {
     .addEventListener("input", onTimelineSliderInput);
   document.getElementById("timeline-play-btn")
     .addEventListener("click", onTimelinePlayToggle);
+  document.querySelectorAll(".timeline-speed-btn").forEach(btn => {
+    btn.addEventListener("click", () => setPlaybackSpeed(parseFloat(btn.dataset.speed)));
+  });
+  setPlaybackSpeed(1);
   regenerateModal = new bootstrap.Modal(document.getElementById("regenerate-modal"));
   document.getElementById("regen-run-btn").addEventListener("click", runRegenerate);
   document.getElementById("cancel-regenerate-btn").addEventListener("click", onCancelRegenerate);
