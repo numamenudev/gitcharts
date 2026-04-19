@@ -488,6 +488,7 @@ def collect_timeline_metrics(
         sampled = _sample_commits(commits, n_snapshots)
     else:
         sampled = _bucket_commits(commits, granularity)
+    n = len(sampled)
 
     # Re-walk log keeping running counters, and at each sampled index snapshot state
     progress(0, n, "starting timeline")
