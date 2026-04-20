@@ -551,7 +551,8 @@ function _stepTweens(nowMs) {
     const e = 1 - Math.pow(1 - p, 3);
     const s = t.fromScale + (t.toScale - t.fromScale) * e;
     b.mesh.scale.y = Math.max(0.0001, s);
-    b.mesh.position.y = (b.mesh.userData._initH * b.mesh.scale.y) / 2;
+    b.mesh.position.y = (b.mesh.userData._baseY || 0) + (b.mesh.userData._initH * b.mesh.scale.y) / 2;
+    _syncPanel(b.mesh);
     const tmpC = t.fromColor.clone().lerp(t.toColor, e);
     _forEachMat(b.mesh.material, mm => mm.color.copy(tmpC));
     if (p >= 1) {

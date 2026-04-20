@@ -1,56 +1,37 @@
 {
   "hotspots": [
     {
-      "file": "guidelines.md",
-      "loc": 2506,
-      "changes": 3,
-      "score": 23.48,
+      "file": "numa-backend/Extensions/ServiceCollectionExtensions.cs",
+      "loc": 428,
+      "changes": 55,
+      "score": 333.38,
       "primary_author": "Nicolo' Bartolomei",
-      "reason": "Modified 3 times, 2,506 lines — strong indicator of accumulated technical debt."
+      "reason": "Modified 55 times, 428 lines (5% of all repo modifications) — strong indicator of accumulated technical debt."
     },
     {
-      "file": "CLAUDE.md",
-      "loc": 589,
-      "changes": 3,
-      "score": 19.14,
+      "file": "numa-backend/Program.cs",
+      "loc": 396,
+      "changes": 37,
+      "score": 221.41,
       "primary_author": "Nicolo' Bartolomei",
-      "reason": "Modified 3 times, 589 lines — strong indicator of accumulated technical debt."
+      "reason": "Modified 37 times, 396 lines — strong indicator of accumulated technical debt."
     },
     {
-      "file": "backlog/tasks/task-64 - Write-unit-tests-for-ChatService.md",
-      "loc": 209,
-      "changes": 3,
-      "score": 16.04,
+      "file": "numa-backend/Services/MenuService.cs",
+      "loc": 477,
+      "changes": 31,
+      "score": 191.26,
       "primary_author": "Nicolo' Bartolomei",
-      "reason": "Modified 3 times, 209 lines — strong indicator of accumulated technical debt."
+      "reason": "Modified 31 times, 477 lines — strong indicator of accumulated technical debt."
     }
   ],
-  "stable": [
-    {
-      "path": "numa-backend",
-      "total_changes": 6,
-      "file_count": 6,
-      "reason": "6 files, 6 total changes (avg 1.0/file) — stable, rarely modified code."
-    },
-    {
-      "path": "supabase",
-      "total_changes": 25,
-      "file_count": 25,
-      "reason": "25 files, 25 total changes (avg 1.0/file) — stable, rarely modified code."
-    },
-    {
-      "path": "(root)",
-      "total_changes": 42,
-      "file_count": 30,
-      "reason": "30 files, 42 total changes (avg 1.4/file) — stable, rarely modified code."
-    }
-  ],
+  "stable": [],
   "warnings": [],
   "suggestions": [
-    "Split 'guidelines.md' into smaller focused modules — 2,506 lines and 3 modifications make it the biggest maintenance burden in the repo.",
-    "Prioritize code review for 'guidelines.md' and 'CLAUDE.md' — they carry the highest risk scores and are the most likely sources of future bugs."
+    "Add comprehensive tests for 'numa-backend/Extensions/ServiceCollectionExtensions.cs' — it changes frequently (55 times) and a regression here could have wide impact.",
+    "Prioritize code review for 'numa-backend/Extensions/ServiceCollectionExtensions.cs' and 'numa-backend/Program.cs' — they carry the highest risk scores and are the most likely sources of future bugs."
   ],
-  "total_files": 127,
-  "total_changes": 221,
+  "total_files": 354,
+  "total_changes": 1214,
   "repo": "numa-backend"
 }
