@@ -415,6 +415,11 @@ function mergeWithDevelop(mainSpec, devSpec) {
         legend: { title: "Dev Period", symbolOpacity: 0.4 },
       },
       order: { field: "dev_period", sort: "ascending" },
+      tooltip: [
+        { field: "commit_date", type: "temporal", title: "commit_date", format: "%b %d, %Y" },
+        { field: "dev_period", type: "ordinal", title: "period" },
+        { field: "line_count", type: "quantitative", title: "line_count" },
+      ],
     },
   };
 
