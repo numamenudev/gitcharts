@@ -9,6 +9,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 #chart-container.loading {
@@ -30,4 +32,39 @@
     margin-top: 0.5rem;
     overflow-x: auto;
     font-size: 0.875rem;
+}
+
+/* Mobile responsive */
+@media (max-width: 575.98px) {
+    #chart-container {
+        min-height: 300px;
+        padding: 0.5rem !important;
+    }
+
+    /* Make Vega chart fit container on mobile */
+    #chart-container .vega-embed {
+        width: 100%;
+    }
+
+    #chart-container .vega-embed canvas,
+    #chart-container .vega-embed svg {
+        max-width: 100%;
+        height: auto !important;
+    }
+
+    footer {
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+
+    footer p {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 767.98px) {
+    #chart-container {
+        min-height: 350px;
+    }
 }

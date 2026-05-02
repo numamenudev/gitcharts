@@ -12,7 +12,7 @@ COPY entrypoint.sh ./
 RUN chmod +x entrypoint.sh
 
 # Copy application files
-COPY server.py git_archaeology.py generate_repos_list.py repos_config.json ./
+COPY server.py git_archaeology.py generate_repos_list.py generate_coverage.py repos_config.json ./
 COPY index.html ./
 COPY js/ js/
 COPY css/ css/

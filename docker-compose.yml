@@ -1,0 +1,28 @@
+services:
+  gitcharts:
+    build: .
+    container_name: gitcharts
+    expose:
+      - "8000"
+    ports:
+      - "9742:8000"
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    volumes:
+      - charts-data:/app/charts
+      - git-cache:/app/.downloads
+      - disk-cache:/app/git-research
+      - ./repos_config.json:/app/repos_config.json
+    networks:
+      - traefik
+    restart: unless-stopped
+
+networks:
+  traefik:
+    name: traefik
+    driver: bridge
+
+volumes:
+  charts-data:
+  git-cache:
+  disk-cache:

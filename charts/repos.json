@@ -1,67 +1,20 @@
 {
-  "datasette": [
-    "clean",
-    "versioned"
-  ],
-  "diskcache": [
-    "clean",
-    "versioned"
-  ],
-  "django": [
-    "clean",
-    "versioned"
-  ],
-  "fastapi": [
-    "clean",
-    "versioned"
-  ],
-  "flask": [
-    "clean",
-    "versioned"
-  ],
-  "linkedin-b2b": [],
-  "marimo": [
-    "clean",
-    "versioned"
-  ],
-  "narwhals": [
-    "clean",
-    "versioned"
-  ],
-  "notebook": [
-    "clean",
-    "versioned"
+  "linkedin-b2b": [
+    "clean"
   ],
   "numa-backend": [
     "clean",
-    "hotspot-develop",
-    "hotspot",
     "versioned"
   ],
   "numa-mobile": [
-    "hotspot-develop",
-    "hotspot"
-  ],
-  "numa-showcase": [],
-  "python-diskcache": [
     "clean",
     "versioned"
   ],
-  "rag-demo": [],
-  "scikit-learn": [
+  "numa-showcase": [
     "clean",
     "versioned"
   ],
-  "scikit-lego": [
-    "clean",
-    "versioned"
-  ],
-  "sentence-transformers": [
-    "clean",
-    "versioned"
-  ],
-  "wandb": [
-    "clean",
-    "versioned"
+  "rag-demo": [
+    "clean"
   ]
 }

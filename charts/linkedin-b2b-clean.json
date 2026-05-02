@@ -1,0 +1,81 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.1.0.json",
+  "config": {
+    "view": {
+      "continuousHeight": 300,
+      "continuousWidth": 300
+    }
+  },
+  "data": {
+    "name": "data-99009f76923c1b56d866632007ae8c61"
+  },
+  "datasets": {
+    "data-99009f76923c1b56d866632007ae8c61": [
+      {
+        "commit_date": "2026-02-27T11:57:54",
+        "line_count": 20825,
+        "period": "2026-02"
+      },
+      {
+        "commit_date": "2026-02-27T11:58:28",
+        "line_count": 20825,
+        "period": "2026-02"
+      },
+      {
+        "commit_date": "2026-02-27T12:32:36",
+        "line_count": 20825,
+        "period": "2026-02"
+      },
+      {
+        "commit_date": "2026-02-27T12:33:52",
+        "line_count": 20824,
+        "period": "2026-02"
+      }
+    ]
+  },
+  "encoding": {
+    "color": {
+      "field": "period",
+      "scale": {
+        "scheme": "viridis"
+      },
+      "title": "Month Added",
+      "type": "ordinal"
+    },
+    "order": {
+      "field": "period",
+      "sort": "ascending",
+      "type": "ordinal"
+    },
+    "tooltip": [
+      {
+        "field": "commit_date",
+        "type": "temporal"
+      },
+      {
+        "field": "period",
+        "type": "ordinal"
+      },
+      {
+        "field": "line_count",
+        "type": "quantitative"
+      }
+    ],
+    "x": {
+      "field": "commit_date",
+      "title": "Date",
+      "type": "temporal"
+    },
+    "y": {
+      "field": "line_count",
+      "title": "Lines of Code",
+      "type": "quantitative"
+    }
+  },
+  "height": 500,
+  "mark": {
+    "type": "area"
+  },
+  "title": "Code Archaeology: Lines of Code by Period Added",
+  "width": 800
+}

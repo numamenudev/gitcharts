@@ -7,509 +7,729 @@
     }
   },
   "data": {
-    "name": "data-b8f46c5330c9518fc96d1ccd7384e326"
+    "name": "data-674f5dc5d1d7ad1d5c093caeeadf2700"
   },
   "datasets": {
-    "data-b8f46c5330c9518fc96d1ccd7384e326": [
+    "data-674f5dc5d1d7ad1d5c093caeeadf2700": [
       {
         "commit_date": "2025-11-03T15:10:11",
         "line_count": 1,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2025-11-03T15:22:39",
         "line_count": 1,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2025-11-03T15:23:25",
         "line_count": 1886,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2025-11-03T15:29:04",
         "line_count": 1886,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2025-11-03T15:41:37",
         "line_count": 1900,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-24T17:11:11",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-24T17:11:11",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-29T15:42:43",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-29T15:42:43",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-29T15:42:43",
         "line_count": 7745,
-        "period": "2026-W05"
+        "period": "2026-01-29"
       },
       {
         "commit_date": "2026-01-29T16:16:49",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-29T16:16:49",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-29T16:16:49",
         "line_count": 10275,
-        "period": "2026-W05"
+        "period": "2026-01-29"
       },
       {
         "commit_date": "2026-01-29T16:17:34",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-29T16:17:34",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-29T16:17:34",
         "line_count": 10559,
-        "period": "2026-W05"
+        "period": "2026-01-29"
       },
       {
         "commit_date": "2026-01-29T23:11:51",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-29T23:11:51",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-29T23:11:51",
         "line_count": 11353,
-        "period": "2026-W05"
+        "period": "2026-01-29"
       },
       {
         "commit_date": "2026-01-30T15:06:07",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-30T15:06:07",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-30T15:06:07",
-        "line_count": 13138,
-        "period": "2026-W05"
+        "line_count": 11353,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-30T15:06:07",
+        "line_count": 1785,
+        "period": "2026-01-30"
       },
       {
         "commit_date": "2026-01-30T15:07:36",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-30T15:07:36",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-30T15:07:36",
-        "line_count": 13141,
-        "period": "2026-W05"
+        "line_count": 11353,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-30T15:07:36",
+        "line_count": 1788,
+        "period": "2026-01-30"
       },
       {
         "commit_date": "2026-01-30T15:41:43",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-30T15:41:43",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-30T15:41:43",
-        "line_count": 13188,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-30T15:41:43",
+        "line_count": 1789,
+        "period": "2026-01-30"
       },
       {
         "commit_date": "2026-01-30T15:42:19",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-30T15:42:19",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-30T15:42:19",
-        "line_count": 13374,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-30T15:42:19",
+        "line_count": 1975,
+        "period": "2026-01-30"
       },
       {
         "commit_date": "2026-01-30T15:47:25",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-30T15:47:25",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-30T15:47:25",
-        "line_count": 13374,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-30T15:47:25",
+        "line_count": 1975,
+        "period": "2026-01-30"
       },
       {
         "commit_date": "2026-01-30T15:49:54",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-30T15:49:54",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-30T15:49:54",
-        "line_count": 13464,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-30T15:49:54",
+        "line_count": 2065,
+        "period": "2026-01-30"
       },
       {
         "commit_date": "2026-01-30T15:52:03",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-30T15:52:03",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-30T15:52:03",
-        "line_count": 13519,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-30T15:52:03",
+        "line_count": 2120,
+        "period": "2026-01-30"
       },
       {
         "commit_date": "2026-01-30T16:00:16",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-30T16:00:16",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-30T16:00:16",
-        "line_count": 13584,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-30T16:00:16",
+        "line_count": 2185,
+        "period": "2026-01-30"
       },
       {
         "commit_date": "2026-01-30T16:23:26",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-30T16:23:26",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-30T16:23:26",
-        "line_count": 13804,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-30T16:23:26",
+        "line_count": 2405,
+        "period": "2026-01-30"
       },
       {
         "commit_date": "2026-01-30T16:32:06",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-30T16:32:06",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-30T16:32:06",
-        "line_count": 13849,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-30T16:32:06",
+        "line_count": 2450,
+        "period": "2026-01-30"
       },
       {
         "commit_date": "2026-01-30T16:32:27",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-30T16:32:27",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-30T16:32:27",
-        "line_count": 14132,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-30T16:32:27",
+        "line_count": 2733,
+        "period": "2026-01-30"
       },
       {
         "commit_date": "2026-01-30T16:35:56",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-30T16:35:56",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-30T16:35:56",
-        "line_count": 14197,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-30T16:35:56",
+        "line_count": 2798,
+        "period": "2026-01-30"
       },
       {
         "commit_date": "2026-01-30T16:36:10",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-30T16:36:10",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-30T16:36:10",
-        "line_count": 14377,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-30T16:36:10",
+        "line_count": 2978,
+        "period": "2026-01-30"
       },
       {
         "commit_date": "2026-01-30T16:39:18",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-30T16:39:18",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-30T16:39:18",
-        "line_count": 14477,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-30T16:39:18",
+        "line_count": 3078,
+        "period": "2026-01-30"
       },
       {
         "commit_date": "2026-01-31T16:53:16",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-31T16:53:16",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-31T16:53:16",
-        "line_count": 14681,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-31T16:53:16",
+        "line_count": 3020,
+        "period": "2026-01-30"
+      },
+      {
+        "commit_date": "2026-01-31T16:53:16",
+        "line_count": 262,
+        "period": "2026-01-31"
       },
       {
         "commit_date": "2026-01-31T17:00:41",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-31T17:00:41",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-31T17:00:41",
-        "line_count": 14914,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-31T17:00:41",
+        "line_count": 2960,
+        "period": "2026-01-30"
+      },
+      {
+        "commit_date": "2026-01-31T17:00:41",
+        "line_count": 555,
+        "period": "2026-01-31"
       },
       {
         "commit_date": "2026-01-31T17:10:01",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-31T17:10:01",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-31T17:10:01",
-        "line_count": 15182,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-31T17:10:01",
+        "line_count": 2929,
+        "period": "2026-01-30"
+      },
+      {
+        "commit_date": "2026-01-31T17:10:01",
+        "line_count": 854,
+        "period": "2026-01-31"
       },
       {
         "commit_date": "2026-01-31T17:18:21",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-31T17:18:21",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-31T17:18:21",
-        "line_count": 15690,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-31T17:18:21",
+        "line_count": 2929,
+        "period": "2026-01-30"
+      },
+      {
+        "commit_date": "2026-01-31T17:18:21",
+        "line_count": 1362,
+        "period": "2026-01-31"
       },
       {
         "commit_date": "2026-01-31T17:24:15",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-31T17:24:15",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-31T17:24:15",
-        "line_count": 15876,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-31T17:24:15",
+        "line_count": 2929,
+        "period": "2026-01-30"
+      },
+      {
+        "commit_date": "2026-01-31T17:24:15",
+        "line_count": 1548,
+        "period": "2026-01-31"
       },
       {
         "commit_date": "2026-01-31T17:32:47",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-31T17:32:47",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-31T17:32:47",
-        "line_count": 16398,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-31T17:32:47",
+        "line_count": 2929,
+        "period": "2026-01-30"
+      },
+      {
+        "commit_date": "2026-01-31T17:32:47",
+        "line_count": 2070,
+        "period": "2026-01-31"
       },
       {
         "commit_date": "2026-01-31T17:37:37",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-31T17:37:37",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-31T17:37:37",
-        "line_count": 16915,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-31T17:37:37",
+        "line_count": 2929,
+        "period": "2026-01-30"
+      },
+      {
+        "commit_date": "2026-01-31T17:37:37",
+        "line_count": 2587,
+        "period": "2026-01-31"
       },
       {
         "commit_date": "2026-01-31T17:42:58",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-31T17:42:58",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-31T17:42:58",
-        "line_count": 17372,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-31T17:42:58",
+        "line_count": 2929,
+        "period": "2026-01-30"
+      },
+      {
+        "commit_date": "2026-01-31T17:42:58",
+        "line_count": 3044,
+        "period": "2026-01-31"
       },
       {
         "commit_date": "2026-01-31T17:49:23",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-01-31T17:49:23",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-01-31T17:49:23",
-        "line_count": 17845,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-01-31T17:49:23",
+        "line_count": 2929,
+        "period": "2026-01-30"
+      },
+      {
+        "commit_date": "2026-01-31T17:49:23",
+        "line_count": 3517,
+        "period": "2026-01-31"
       },
       {
         "commit_date": "2026-02-01T01:43:32",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-02-01T01:43:32",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-02-01T01:43:32",
-        "line_count": 18404,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-02-01T01:43:32",
+        "line_count": 2929,
+        "period": "2026-01-30"
+      },
+      {
+        "commit_date": "2026-02-01T01:43:32",
+        "line_count": 3517,
+        "period": "2026-01-31"
+      },
+      {
+        "commit_date": "2026-02-01T01:43:32",
+        "line_count": 559,
+        "period": "2026-02-01"
       },
       {
         "commit_date": "2026-02-01T01:52:40",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-02-01T01:52:40",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-02-01T01:52:40",
-        "line_count": 18932,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-02-01T01:52:40",
+        "line_count": 2929,
+        "period": "2026-01-30"
+      },
+      {
+        "commit_date": "2026-02-01T01:52:40",
+        "line_count": 3517,
+        "period": "2026-01-31"
+      },
+      {
+        "commit_date": "2026-02-01T01:52:40",
+        "line_count": 1087,
+        "period": "2026-02-01"
       },
       {
         "commit_date": "2026-02-01T02:02:19",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-02-01T02:02:19",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-02-01T02:02:19",
-        "line_count": 19163,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-02-01T02:02:19",
+        "line_count": 2867,
+        "period": "2026-01-30"
+      },
+      {
+        "commit_date": "2026-02-01T02:02:19",
+        "line_count": 3517,
+        "period": "2026-01-31"
+      },
+      {
+        "commit_date": "2026-02-01T02:02:19",
+        "line_count": 1380,
+        "period": "2026-02-01"
       },
       {
         "commit_date": "2026-02-01T14:58:15",
         "line_count": 1889,
-        "period": "2025-W45"
+        "period": "2025-11-03"
       },
       {
         "commit_date": "2026-02-01T14:58:15",
         "line_count": 29,
-        "period": "2026-W04"
+        "period": "2026-01-24"
       },
       {
         "commit_date": "2026-02-01T14:58:15",
-        "line_count": 19163,
-        "period": "2026-W05"
+        "line_count": 11352,
+        "period": "2026-01-29"
+      },
+      {
+        "commit_date": "2026-02-01T14:58:15",
+        "line_count": 2867,
+        "period": "2026-01-30"
+      },
+      {
+        "commit_date": "2026-02-01T14:58:15",
+        "line_count": 3517,
+        "period": "2026-01-31"
+      },
+      {
+        "commit_date": "2026-02-01T14:58:15",
+        "line_count": 1380,
+        "period": "2026-02-01"
       }
     ]
   },
@@ -519,7 +739,7 @@
       "scale": {
         "scheme": "viridis"
       },
-      "title": "Week Added",
+      "title": "Day Added",
       "type": "ordinal"
     },
     "order": {
