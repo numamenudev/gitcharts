@@ -233,9 +233,13 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
         return result.stdout
 
 
-    @cache.memoize()
     def get_commit_list(repo_path: str, ref: str = "HEAD") -> list[tuple[str, datetime]]:
-        """Get list of all commits with their dates."""
+        """Get list of all commits with their dates.
+
+        Not memoized: the cache key (repo_path, ref) is stable, so once a
+        regen populates the cache, later regens never see new commits even
+        after `git fetch` advances the ref. Calling git log is sub-second.
+        """
         output = run_git_command(
             ["git", "log", "--format=%H %at", "--reverse", ref],
             repo_path,
