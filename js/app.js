@@ -1,3 +1,75 @@
+// ========================================
+// API helpers
+// ========================================
+
+/**
+ * Build an API URL relative to the page's directory, regardless of whether
+ * the page was loaded with a trailing slash. Without this, accessing the app
+ * at `/gitcharts` (no slash) resolves `api/...` to `/api/...` and bypasses
+ * the reverse-proxy route, returning an HTML 404 page.
+ */
+function apiUrl(path) {
+  let dir = window.location.pathname;
+  if (!dir.endsWith("/")) dir += "/";
+  return dir + path.replace(/^\//, "");
+}
+
+/**
+ * Fetch wrapper that surfaces non-JSON responses (e.g. HTML 404 pages from a
+ * reverse proxy) as readable errors instead of letting `response.json()` blow
+ * up with "unexpected token '<'".
+ */
+async function fetchJson(url, options) {
+  const res = await fetch(url, options);
+  const text = await res.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    const snippet = text.slice(0, 500);
+    throw new Error(
+      `Server returned non-JSON response (HTTP ${res.status}) for ${url}\n\n${snippet}`
+    );
+  }
+  if (!res.ok) {
+    const msg = data.error || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+/**
+ * Show a Bootstrap modal popup with a full, scrollable error message.
+ */
+function showErrorPopup(title, message) {
+  let modalEl = document.getElementById("error-popup-modal");
+  if (!modalEl) {
+    modalEl = document.createElement("div");
+    modalEl.id = "error-popup-modal";
+    modalEl.className = "modal fade";
+    modalEl.tabIndex = -1;
+    modalEl.innerHTML = `
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title text-danger" id="error-popup-title">Error</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <pre id="error-popup-body" style="white-space: pre-wrap; word-break: break-word; margin: 0;"></pre>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(modalEl);
+  }
+  modalEl.querySelector("#error-popup-title").textContent = title;
+  modalEl.querySelector("#error-popup-body").textContent = message;
+  bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
 // Application State
 const state = {
   repos: {}, // Will be loaded from repos.json: {name: [variants]}
@@ -18,6 +90,7 @@ let regenerateStatus;
 let dateFrom;
 let dateTo;
 let showDevelopCheckbox;
+let showCoverageCheckbox;
 
 // ========================================
 // URL State Management
@@ -114,15 +187,18 @@ async function loadChart(repo, variant) {
 function applyTransforms(spec) {
   const copy = JSON.parse(JSON.stringify(spec));
 
-  // Collect all encodings (top-level or per-layer)
-  const encodings = [];
-  if (copy.encoding) encodings.push(copy.encoding);
-  if (copy.layer) copy.layer.forEach(l => { if (l.encoding) encodings.push(l.encoding); });
+  // Recursively collect all layers (handles nested layer groups)
+  function collectLayers(node, out) {
+    if (node.encoding) out.push(node);
+    if (node.layer) node.layer.forEach(l => collectLayers(l, out));
+  }
+  const allLayers = [];
+  collectLayers(copy, allLayers);
 
   // Invert layers — apply to ALL encodings
   const sortOrder = state.invertLayers ? "descending" : "ascending";
-  encodings.forEach(enc => {
-    if (enc.order) enc.order.sort = sortOrder;
+  allLayers.forEach(l => {
+    if (l.encoding?.order) l.encoding.order.sort = sortOrder;
   });
 
   // Date range filter — filter inline data values directly
@@ -140,14 +216,12 @@ function applyTransforms(spec) {
       });
     };
 
-    // Filter inline data (values arrays) in each layer or top-level
-    if (copy.layer) {
-      copy.layer.forEach(l => {
-        if (l.data?.values) {
-          l.data.values = filterData(l.data.values);
-        }
-      });
-    }
+    // Filter inline data in all layers (including nested)
+    allLayers.forEach(l => {
+      if (l.data?.values) {
+        l.data.values = filterData(l.data.values);
+      }
+    });
 
     // Filter datasets (named data)
     if (copy.datasets) {
@@ -175,6 +249,12 @@ async function renderChart(spec) {
     // Clear container
     chartContainer.innerHTML = "";
     chartContainer.className = "";
+
+    // Make chart responsive: use container width instead of hardcoded value
+    const containerWidth = chartContainer.clientWidth - 32; // account for padding
+    if (containerWidth > 0 && containerWidth < (spec.width || 800)) {
+      spec = { ...spec, width: containerWidth, height: Math.round(containerWidth * 0.6) };
+    }
 
     // Embed chart
     await vegaEmbed("#chart-container", spec, embedOpt);
@@ -335,6 +415,174 @@ function mergeWithDevelop(mainSpec, devSpec) {
   };
 }
 
+/**
+ * Load coverage data JSON for a repo (not a Vega-Lite spec, just data)
+ */
+async function loadCoverageData(repo) {
+  const cacheKey = `${repo}-coverage`;
+  if (state.loadedCharts[cacheKey]) return state.loadedCharts[cacheKey];
+  try {
+    const response = await fetch(`charts/${repo}-coverage.json?t=${Date.now()}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    state.loadedCharts[cacheKey] = data;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Merge coverage data: transforms the chart into covered (viridis) + uncovered (gray)
+ * with a dashed red line showing global coverage %.
+ * coverageData format: { global_rate: 0.69, rates: { "2025-11-03": 0.42, ... } }
+ */
+function mergeWithCoverage(spec, coverageData) {
+  if (!coverageData || !coverageData.rates) return spec;
+  const copy = JSON.parse(JSON.stringify(spec));
+  const rates = coverageData.rates;
+  const globalRate = coverageData.global_rate;
+
+  // Helper: split data rows into covered + uncovered aggregates
+  function splitData(rows, periodField) {
+    const coveredRows = [];
+    const totals = {}; // commit_date → {covered, total}
+    for (const d of rows) {
+      const period = d[periodField];
+      const rate = rates[period] ?? globalRate;
+      const cov = Math.round(d.line_count * rate);
+      const row = { commit_date: d.commit_date, line_count: cov };
+      row[periodField] = period;
+      coveredRows.push(row);
+      if (!totals[d.commit_date]) totals[d.commit_date] = { covered: 0, total: 0 };
+      totals[d.commit_date].covered += cov;
+      totals[d.commit_date].total += d.line_count;
+    }
+    const uncovAgg = Object.entries(totals)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([cd, v]) => ({
+        commit_date: cd,
+        covered_total: v.covered,
+        total: v.total,
+        coverage_pct: v.total > 0 ? Math.round(v.covered / v.total * 1000) / 10 : 0,
+      }));
+    return { coveredRows, uncovAgg };
+  }
+
+  // Collect layers and data sources
+  const newLayers = [];
+  const allUncovAgg = []; // for the red dashed line
+
+  // Process each area layer (main + develop)
+  const layers = copy.layer || [{
+    data: copy.data, mark: copy.mark, encoding: copy.encoding,
+  }];
+
+  for (const layer of layers) {
+    const markType = typeof layer.mark === "string" ? layer.mark : layer.mark?.type;
+
+    // Keep non-area layers (tags: rule + text) as-is
+    if (markType !== "area") {
+      newLayers.push(layer);
+      continue;
+    }
+
+    // Get data for this area layer
+    let rows = [];
+    const dataName = layer.data?.name;
+    if (dataName && copy.datasets?.[dataName]) {
+      rows = copy.datasets[dataName];
+    } else if (layer.data?.values) {
+      rows = layer.data.values;
+    }
+    if (rows.length === 0) continue;
+
+    // Detect period field (main uses "period", develop uses "dev_period")
+    const periodField = rows[0].dev_period !== undefined ? "dev_period" : "period";
+    const isDev = periodField === "dev_period";
+    const opacity = isDev ? 0.4 : (typeof layer.mark === "object" ? (layer.mark.opacity ?? 1) : 1);
+
+    const { coveredRows, uncovAgg } = splitData(rows, periodField);
+    allUncovAgg.push(...uncovAgg);
+
+    // Covered area layer (viridis colors)
+    const colorEnc = layer.encoding?.color ? { ...layer.encoding.color } : {
+      field: periodField, type: "ordinal", scale: { scheme: "viridis" },
+    };
+    newLayers.push({
+      data: { values: coveredRows },
+      mark: { type: "area", opacity },
+      encoding: {
+        x: { field: "commit_date", type: "temporal", title: "Date" },
+        y: { field: "line_count", type: "quantitative", title: "Lines of Code", stack: true },
+        color: colorEnc,
+        order: { field: periodField, sort: "ascending" },
+      },
+    });
+
+    // Uncovered gray area (y to y2) — hide axis to avoid clutter on right
+    newLayers.push({
+      data: { values: uncovAgg },
+      mark: { type: "area", color: "#d5d5d5", opacity },
+      encoding: {
+        x: { field: "commit_date", type: "temporal" },
+        y: { field: "covered_total", type: "quantitative", axis: null },
+        y2: { field: "total" },
+        tooltip: [
+          { field: "commit_date", type: "temporal", title: "Date" },
+          { field: "coverage_pct", type: "quantitative", title: "Coverage %" },
+          { field: "covered_total", type: "quantitative", title: "Covered" },
+          { field: "total", type: "quantitative", title: "Total" },
+        ],
+      },
+    });
+  }
+
+  // Red dashed horizontal line with right y-axis (0-100%)
+  const covPct = Math.round(globalRate * 1000) / 10;
+  const ruleLayer = {
+    data: { values: [{ coverage_pct: covPct }] },
+    mark: {
+      type: "rule",
+      color: "#e45756",
+      strokeWidth: 2,
+      strokeDash: [6, 4],
+    },
+    encoding: {
+      y: {
+        field: "coverage_pct",
+        type: "quantitative",
+        scale: { domain: [0, 100] },
+        axis: { orient: "right", title: "Coverage %", titleColor: "#e45756", grid: false },
+      },
+      tooltip: [
+        { field: "coverage_pct", type: "quantitative", title: "Global Coverage %" },
+      ],
+    },
+  };
+
+  // Build final spec — nest area layers in one group, rule in another,
+  // so resolve.scale.y: "independent" only separates areas vs rule (not each area from each other)
+  const resolve = copy.resolve ? { ...copy.resolve } : {};
+  resolve.scale = { ...(resolve.scale || {}), y: "independent" };
+  resolve.axis = { ...(resolve.axis || {}), y: "independent" };
+
+  const result = {
+    $schema: copy.$schema,
+    config: copy.config,
+    title: copy.title,
+    width: copy.width,
+    height: copy.height,
+    layer: [
+      { layer: newLayers },
+      ruleLayer,
+    ],
+    resolve,
+  };
+
+  return result;
+}
+
 async function updateChart() {
   showLoading();
 
@@ -349,6 +597,14 @@ async function updateChart() {
         spec = mergeWithDevelop(spec, devSpec);
       } catch {
         // Develop chart not available — silently ignore
+      }
+    }
+
+    // Merge coverage line overlay
+    if (showCoverageCheckbox.checked) {
+      const coverageData = await loadCoverageData(state.currentRepo);
+      if (coverageData) {
+        spec = mergeWithCoverage(spec, coverageData);
       }
     }
 
@@ -492,6 +748,7 @@ async function init() {
   dateFrom = document.getElementById("date-from");
   dateTo = document.getElementById("date-to");
   showDevelopCheckbox = document.getElementById("show-develop");
+  showCoverageCheckbox = document.getElementById("show-coverage");
   showTagsCheckbox = document.getElementById("show-tags");
 
   // Load repositories list
@@ -523,12 +780,20 @@ async function init() {
   dateFrom.addEventListener("change", updateChart);
   dateTo.addEventListener("change", updateChart);
   showDevelopCheckbox.addEventListener("change", updateChart);
+  showCoverageCheckbox.addEventListener("change", updateChart);
   document.getElementById("reset-dates-btn").addEventListener("click", () => {
     dateFrom.value = "";
     dateTo.value = "";
     updateChart();
   });
   window.addEventListener("popstate", onPopState);
+
+  // Re-render chart on window resize (debounced)
+  let resizeTimer;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(updateChart, 300);
+  });
 
   // Load and render initial chart
   await updateChart();
@@ -545,28 +810,22 @@ async function onRegenerate() {
   regenerateStatus.textContent = `Generating ${repo}...`;
 
   try {
-    const res = await fetch("/api/regenerate", {
+    await fetchJson(apiUrl("api/regenerate"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ granularity, repo }),
     });
-    const data = await res.json();
-    if (data.error) {
-      regenerateStatus.textContent = data.error;
-      regenerateBtn.disabled = false;
-      return;
-    }
     pollStatus();
   } catch (e) {
-    regenerateStatus.textContent = "Error: " + e.message;
+    regenerateStatus.textContent = "Error (click for details)";
     regenerateBtn.disabled = false;
+    showErrorPopup("Regenerate failed", e.message);
   }
 }
 
 async function pollStatus() {
   try {
-    const res = await fetch("/api/status");
-    const data = await res.json();
+    const data = await fetchJson(apiUrl("api/status"));
 
     if (data.running) {
       regenerateStatus.textContent = data.repo
@@ -574,8 +833,9 @@ async function pollStatus() {
         : "Starting...";
       setTimeout(pollStatus, 2000);
     } else if (data.error) {
-      regenerateStatus.textContent = "Error: " + data.error;
+      regenerateStatus.textContent = "Error (click for details)";
       regenerateBtn.disabled = false;
+      showErrorPopup("Regeneration error", data.error);
     } else {
       regenerateStatus.textContent = "Done!";
       regenerateBtn.disabled = false;
@@ -585,8 +845,9 @@ async function pollStatus() {
       setTimeout(() => { regenerateStatus.textContent = ""; }, 3000);
     }
   } catch (e) {
-    regenerateStatus.textContent = "Error polling status";
+    regenerateStatus.textContent = "Error polling status (click for details)";
     regenerateBtn.disabled = false;
+    showErrorPopup("Status poll failed", e.message);
   }
 }
 
@@ -632,8 +893,7 @@ async function openSettings() {
   configStatus.textContent = "Loading...";
 
   try {
-    const res = await fetch("/api/config");
-    const config = await res.json();
+    const config = await fetchJson(apiUrl("api/config"));
     const entries = Object.entries(config);
 
     editor.innerHTML = entries
@@ -642,7 +902,8 @@ async function openSettings() {
 
     configStatus.textContent = "";
   } catch (e) {
-    configStatus.textContent = "Error loading config";
+    configStatus.textContent = "Error loading config (click for details)";
+    showErrorPopup("Failed to load config", e.message);
   }
 
   settingsModal.show();
@@ -673,12 +934,11 @@ async function saveConfig() {
   configStatus.textContent = "Saving...";
 
   try {
-    const res = await fetch("/api/config", {
+    const data = await fetchJson(apiUrl("api/config"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(config),
     });
-    const data = await res.json();
     if (data.saved) {
       configStatus.textContent = "Saved!";
       // Reload repos list and dropdown
@@ -691,7 +951,8 @@ async function saveConfig() {
       setTimeout(() => settingsModal.hide(), 1000);
     }
   } catch (e) {
-    configStatus.textContent = "Error saving: " + e.message;
+    configStatus.textContent = "Error saving (click for details)";
+    showErrorPopup("Failed to save config", e.message);
   }
 }
 
