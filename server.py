@@ -117,17 +117,24 @@ def regenerate_all(granularity):
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def _api_path(self):
+        """Return the request path normalized so that any reverse-proxy prefix
+        (e.g. /gitcharts/api/status) still matches the /api/* routes below."""
+        idx = self.path.find("/api/")
+        return self.path[idx:] if idx >= 0 else self.path
+
     def do_GET(self):
-        if self.path == "/api/status":
+        api_path = self._api_path()
+        if api_path == "/api/status":
             self._json_response(status)
-        elif self.path == "/api/config":
+        elif api_path == "/api/config":
             with open(CONFIG_PATH) as f:
                 self._json_response(json.load(f))
         else:
             super().do_GET()
 
     def do_POST(self):
-        if self.path == "/api/regenerate":
+        if self._api_path() == "/api/regenerate":
             if status["running"]:
                 self._json_response({"error": "Already running"}, code=409)
                 return
@@ -151,7 +158,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_error(404)
 
     def do_PUT(self):
-        if self.path == "/api/config":
+        if self._api_path() == "/api/config":
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length))
             with open(CONFIG_PATH, "w") as f:
