@@ -3,3 +3,5 @@ __marimo__/
 __pycache__/
 repo-cache
 git-research
+
+repos_config.json
