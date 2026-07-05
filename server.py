@@ -119,38 +119,62 @@ def run_hotspot(repo_name, config, branch="", save_as="", path_prefix="", timeli
         _current_proc = None
 
 
+ARCHAEOLOGY_BATCH = 100  # uncached commits analyzed per subprocess invocation
+
+
 def regenerate_repo(repo_name, config, granularity, branch="", save_as=""):
-    """Run git_archaeology.py for a single repo/branch. Cancellable."""
+    """Run git_archaeology.py for a single repo/branch. Cancellable.
+
+    Runs in chunks of ARCHAEOLOGY_BATCH uncached commits: each invocation
+    exits after its batch so the OS reclaims heap the C allocator never returns
+    (the source of the monotonic RAM climb / OOM on large repos). The
+    per-commit parquet cache makes each run resume where the last stopped; we
+    loop until the script reports REMAINING=0.
+    """
     global _current_proc
-    cmd = [
+    _global_plan["done_weight"] += _global_plan["current_stage_weight"]
+    _global_plan["current_stage_weight"] = 15
+
+    base_cmd = [
         "uv", "run", str(SCRIPT_PATH),
         "--repo", config["url"],
         "--samples", str(config["samples"]),
         "--file-extensions", config["extensions"],
         "--granularity", granularity,
+        "--batch", str(ARCHAEOLOGY_BATCH),
     ]
     if branch:
-        cmd += ["--branch", branch]
+        base_cmd += ["--branch", branch]
         if save_as and save_as != branch:
-            cmd += ["--branch-label", save_as]
-    # Treat whole archaeology run as a single coarse stage
-    _global_plan["done_weight"] += _global_plan["current_stage_weight"]
-    _global_plan["current_stage_weight"] = 15
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    _current_proc = proc
-    try:
-        for _ in proc.stdout:
-            if status.get("cancelled"):
-                try: proc.terminate()
-                except Exception: pass
-                break
-        proc.wait()
-    finally:
-        _current_proc = None
+            base_cmd += ["--branch-label", save_as]
+
+    while True:
+        remaining = None
+        proc = subprocess.Popen(base_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        _current_proc = proc
+        try:
+            for line in proc.stdout:
+                m = re.search(r"REMAINING=(\d+)", line)
+                if m:
+                    remaining = int(m.group(1))
+                if status.get("cancelled"):
+                    try: proc.terminate()
+                    except Exception: pass
+                    break
+            proc.wait()
+        finally:
+            _current_proc = None
+
+        if proc.returncode != 0 and not status.get("cancelled"):
+            raise RuntimeError(f"archaeology exited {proc.returncode}")
+        if status.get("cancelled"):
+            break
+        # remaining is None when batch wasn't hit (all done in one pass).
+        if not remaining:
+            break
+
     _global_plan["done_weight"] += _global_plan["current_stage_weight"]
     _global_plan["current_stage_weight"] = 0
-    if proc.returncode != 0 and not status.get("cancelled"):
-        raise RuntimeError(f"archaeology exited {proc.returncode}")
 
 
 _BRANCH_CACHE = {}

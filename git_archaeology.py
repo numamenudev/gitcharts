@@ -143,6 +143,12 @@ def _():
         branch_label: str = Field(
             default="", description="Label for output file (default: same as branch)"
         )
+        batch: int = Field(
+            default=0,
+            description="Max uncached commits to analyze per run (0 = all). "
+            "Enables incremental chunking: the process exits after each batch so "
+            "the OS reclaims memory; re-invoke until REMAINING=0.",
+        )
 
     return (RepoParams,)
 
@@ -241,7 +247,7 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
         after `git fetch` advances the ref. Calling git log is sub-second.
         """
         output = run_git_command(
-            ["git", "log", "--format=%H %at", "--reverse", ref],
+            ["git", "log", "--format=%H %ct", "--reverse", ref],
             repo_path,
         )
         commits = []
@@ -322,31 +328,44 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
         return [commits[i] for i in indices]
 
 
-    @cache.memoize()
     def analyze_single_commit(
         repo_path: str,
         commit_hash: str,
         commit_timestamp: int,
         extensions: list[str] | None,
-    ) -> list[tuple[int, int]]:
-        """Analyze a single commit with blob-level blame dedup."""
+    ) -> list[tuple[int, int, int]]:
+        """Analyze a commit, returning day-aggregated line counts.
+
+        Aggregates per-line blame timestamps into (commit_timestamp, epoch_day,
+        count) rows INSIDE the worker, so peak memory per commit is O(distinct
+        days) not O(lines). Without this, many concurrent commits each hold the
+        full per-line list and blow up RAM (OOM on large repos).
+        """
+        from collections import Counter
+
         files = get_tracked_files(repo_path, commit_hash, extensions)
 
-        def blame_file(file_blob: tuple[str, str]) -> list[int]:
-            file_path, blob_hash = file_blob
-            return get_blame_by_blob(blob_hash, repo_path, commit_hash, file_path)
+        # Blame files SEQUENTIALLY and fold each into the day-counter immediately.
+        # The outer commit-level pool already gives 16-way parallelism; a nested
+        # file executor let 32 workers race ahead and pile up completed per-file
+        # blame lists faster than they were consumed → O(repo lines) per commit
+        # × concurrent commits → OOM. Sequential keeps peak at one file's blame.
+        day_counts: Counter = Counter()
+        for file_path, blob_hash in files:
+            for ts in get_blame_by_blob(blob_hash, repo_path, commit_hash, file_path):
+                day_counts[ts // 86400] += 1  # bucket by epoch-day
+        return [(commit_timestamp, day, count) for day, count in day_counts.items()]
 
-        results = []
-        file_futures = {_file_executor.submit(blame_file, fb): fb for fb in files}
-        for future in as_completed(file_futures):
-            for ts in future.result():
-                results.append((commit_timestamp, ts))
-        return results
 
+    def _parquet_dir_for_repo(repo_path, extensions):
+        """Deterministic per-repo directory for parquet chunks.
 
-    def _parquet_dir_for_run(repo_path, sampled_commits, extensions):
-        """Deterministic directory for parquet chunks based on run parameters."""
-        key = repr((repo_path, [(h, d.isoformat()) for h, d in sampled_commits], extensions))
+        Keyed only by (repo_path, extensions) — NOT the sampled commit set —
+        so per-commit parquets (named by immutable commit_hash) are reused
+        across runs. Extensions stay in the key because they determine which
+        files are blamed, hence the line set.
+        """
+        key = repr((str(repo_path), extensions))
         run_hash = hashlib.sha256(key.encode()).hexdigest()[:12]
         out = Path("git-research") / "parquet-chunks" / run_hash
         out.mkdir(parents=True, exist_ok=True)
@@ -359,10 +378,38 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
         progress_bar=None,
         is_script: bool = False,
         max_workers: int = 16,
+        batch: int = 0,
     ) -> Path:
-        """Collect raw blame data, spilling each commit to a parquet file."""
-        parquet_dir = _parquet_dir_for_run(repo_path, sampled_commits, extensions)
-        total = len(sampled_commits)
+        """Collect blame data, spilling each commit to a per-day-aggregated parquet.
+
+        Incremental: commits whose parquet already exists are skipped before
+        submission — never recomputed, never materialized in RAM. Each parquet
+        stores day-level counts (commit_date, line_day, line_count) instead of
+        one row per line, bounding disk and downstream aggregation memory.
+
+        Chunking: if `batch` > 0, only the first `batch` uncached commits are
+        analyzed this run, then the process exits (freeing all heap the C
+        allocator never returns to the OS). Prints `REMAINING=<n>` so the caller
+        can re-invoke until 0. Commits are processed oldest-first (git log
+        --reverse order), so the chart fills in chronologically.
+        """
+        parquet_dir = _parquet_dir_for_repo(repo_path, extensions)
+        # Empty-but-typed schema, reused for negatives (commits with 0 lines).
+        empty_schema = {
+            "commit_date": pl.Int64,
+            "line_day": pl.Date,
+            "line_count": pl.UInt32,
+        }
+        # Skip commits already cached — the core of "compute each commit once".
+        pending = [(h, d) for h, d in sampled_commits
+                   if not (parquet_dir / f"{h}.parquet").exists()]
+        remaining = 0
+        if batch and len(pending) > batch:
+            remaining = len(pending) - batch
+            pending = pending[:batch]
+        if is_script:
+            print(f"REMAINING={remaining}")
+        total = len(pending)
         done = 0
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -370,7 +417,7 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
                 executor.submit(
                     analyze_single_commit, str(repo_path), h, int(d.timestamp()), extensions
                 ): (h, d)
-                for h, d in sampled_commits
+                for h, d in pending
             }
             for future in as_completed(futures):
                 commit_hash, _ = futures[future]
@@ -380,14 +427,18 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
                 if is_script:
                     print(f"  [{done}/{total}] Analyzed {commit_hash[:8]}")
                 out_path = parquet_dir / f"{commit_hash}.parquet"
-                if not out_path.exists():
-                    rows = future.result()
-                    if rows:
-                        commit_ts, line_ts = zip(*rows)
-                        pl.DataFrame({
-                            "commit_date": list(commit_ts),
-                            "line_timestamp": list(line_ts),
-                        }).write_parquet(out_path)
+                rows = future.result()  # already (commit_ts, epoch_day, count)
+                if rows:
+                    commit_ts, days, counts = zip(*rows)
+                    pl.DataFrame({
+                        "commit_date": list(commit_ts),
+                        # pl.Date is days-since-epoch, exactly ts // 86400.
+                        "line_day": pl.Series(list(days), dtype=pl.Int32).cast(pl.Date),
+                        "line_count": pl.Series(list(counts), dtype=pl.UInt32),
+                    }).write_parquet(out_path)
+                else:
+                    # Cache the negative so it isn't re-analyzed every run.
+                    pl.DataFrame(schema=empty_schema).write_parquet(out_path)
 
         return parquet_dir
 
@@ -457,7 +508,8 @@ def _(
 
 
 @app.cell
-def _(collect_blame_data, extensions, mo, pl, repo_path, sampled):
+def _(collect_blame_data, extensions, mo, pl, repo_params, repo_path, sampled):
+    _batch = repo_params.batch if mo.app_meta().mode == "script" else 0
     with mo.status.progress_bar(
         total=len(sampled),
         title="Analyzing commits",
@@ -470,15 +522,24 @@ def _(collect_blame_data, extensions, mo, pl, repo_path, sampled):
             extensions,
             progress_bar=bar,
             is_script=mo.app_meta().mode == "script",
+            batch=_batch,
         )
 
-    parquet_files = list(parquet_dir.glob("*.parquet"))
+    # Read ONLY the parquets for the currently-sampled commits. The dir is now
+    # per-repo (shared across runs/branches), so globbing would pull the entire
+    # history ever cached and reintroduce the OOM.
+    parquet_files = [parquet_dir / f"{h}.parquet" for h, _ in sampled
+                     if (parquet_dir / f"{h}.parquet").exists()]
     if parquet_files:
         raw_df = pl.read_parquet(parquet_files).with_columns(
             pl.from_epoch("commit_date", time_unit="s").alias("commit_date")
         )
     else:
-        raw_df = pl.DataFrame({"commit_date": pl.Series([], dtype=pl.Datetime), "line_timestamp": pl.Series([], dtype=pl.Int64)})
+        raw_df = pl.DataFrame({
+            "commit_date": pl.Series([], dtype=pl.Datetime),
+            "line_day": pl.Series([], dtype=pl.Date),
+            "line_count": pl.Series([], dtype=pl.UInt32),
+        })
     return (raw_df,)
 
 
@@ -494,8 +555,10 @@ def _(mo):
 def _(granularity_select, mo, pl, raw_df, repo_params):
     granularity = repo_params.granularity if mo.app_meta().mode == "script" else granularity_select.value
 
-    # Vectorized period derivation using native Polars dt ops
-    ts_col = pl.from_epoch(pl.col("line_timestamp"), time_unit="s")
+    # Vectorized period derivation using native Polars dt ops.
+    # line_day is a pre-aggregated pl.Date (day granularity is the finest view),
+    # so dt ops roll it up to any coarser period.
+    ts_col = pl.col("line_day")
 
     if granularity == "Year":
         period_expr = ts_col.dt.year().cast(pl.Utf8).alias("period")
@@ -529,8 +592,7 @@ def _(granularity_select, mo, pl, raw_df, repo_params):
     df = (
         raw_df.with_columns(period_expr)
         .group_by(["commit_date", "period"])
-        .len()
-        .rename({"len": "line_count"})
+        .agg(pl.col("line_count").sum())
         .sort(["commit_date", "period"])
     )
     return (df,)
