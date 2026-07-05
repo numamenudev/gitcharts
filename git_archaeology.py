@@ -358,7 +358,7 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
         extensions: list[str] | None,
         progress_bar=None,
         is_script: bool = False,
-        max_workers: int = 32,
+        max_workers: int = 16,
     ) -> Path:
         """Collect raw blame data, spilling each commit to a parquet file."""
         parquet_dir = _parquet_dir_for_run(repo_path, sampled_commits, extensions)
