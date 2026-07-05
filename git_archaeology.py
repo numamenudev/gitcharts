@@ -247,7 +247,7 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
         after `git fetch` advances the ref. Calling git log is sub-second.
         """
         output = run_git_command(
-            ["git", "log", "--format=%H %ct", "--reverse", ref],
+            ["git", "log", "--format=%H %at", "--reverse", ref],
             repo_path,
         )
         commits = []
