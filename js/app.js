@@ -1356,6 +1356,7 @@ function onPopState() {
  * Load repositories list from repos.json
  */
 async function loadRepos() {
+  let generated = {};
   try {
     const response = await fetch("charts/repos.json");
     if (!response.ok) {
@@ -1365,23 +1366,38 @@ async function loadRepos() {
 
     // Handle legacy array format: ["repo1", "repo2"]
     if (Array.isArray(data)) {
-      const obj = {};
       await Promise.all(
         data.map(async (repo) => {
           const variants = ["clean"];
           const res = await fetch(`charts/${repo}-versioned.json`, { method: "HEAD" });
           if (res.ok) variants.push("versioned");
-          obj[repo] = variants;
+          generated[repo] = variants;
         })
       );
-      return obj;
+    } else {
+      generated = data;
     }
-
-    return data;
   } catch (error) {
     console.error("Error loading repos:", error);
-    return {};
   }
+
+  // Merge configured-but-not-yet-generated repos so a repo added to
+  // repos_config.json shows in the dropdown before its charts exist.
+  // Selecting one with no data shows the "Chart Not Available" prompt →
+  // user clicks Regenerate. Empty variant list = no generated charts yet.
+  try {
+    const configRes = await fetch(apiUrl("api/config"));
+    if (configRes.ok) {
+      const config = await configRes.json();
+      for (const repo of Object.keys(config)) {
+        if (!(repo in generated)) generated[repo] = [];
+      }
+    }
+  } catch (error) {
+    // Static hosting without the API — fall back to generated repos only.
+  }
+
+  return generated;
 }
 
 /**
