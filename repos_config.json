@@ -2,31 +2,66 @@
   "numa-mobile": {
     "url": "https://github.com/NuMa-Menu-Srl/numa-mobile",
     "extensions": ".dart,.swift,.h,.cpp,.cc,.c,.m,.mm,.kts,.kt,.java,.xml,.yaml,.yml,.json,.sql,.mjs,.js,.ts,.tsx,.jsx,.css,.scss,.html,.py,.sh,.bash,.zsh,.rb,.go,.rs,.cs,.csproj,.cshtml,.razor,.r,.lua,.php,.pl,.ex,.exs,.erl,.hs,.scala,.groovy,.gradle,.cmake,.makefile,.dockerfile,.tf,.hcl,.proto,.graphql,.gql,.toml,.ini,.cfg,.conf,.env,.properties,.plist,.entitlements,.pbxproj,.xcconfig,.xcworkspacedata,.storyboard,.xib,.nib,.md,.rst,.txt,.svg,.prisma,.http,.slnx,.sln,.lock",
-    "samples": 9999
+    "samples": 9999,
+    "exclude": [
+      "*package-lock.json",
+      "*pnpm-lock.yaml",
+      "*yarn.lock",
+      "CHANGELOG.md",
+      "lib/l10n/app_localizations*.dart",
+      "lib/widgetbook/widgetbook_directories.dart",
+      "*.g.dart",
+      "*.freezed.dart",
+      "*.mocks.dart",
+      "docs/v1.json",
+      "*.svg"
+    ]
   },
   "numa-backend": {
     "url": "https://github.com/NuMa-Menu-Srl/numa-backend",
     "extensions": ".dart,.swift,.h,.cpp,.cc,.c,.m,.mm,.kts,.kt,.java,.xml,.yaml,.yml,.json,.sql,.mjs,.js,.ts,.tsx,.jsx,.css,.scss,.html,.py,.sh,.bash,.zsh,.rb,.go,.rs,.cs,.csproj,.cshtml,.razor,.r,.lua,.php,.pl,.ex,.exs,.erl,.hs,.scala,.groovy,.gradle,.cmake,.makefile,.dockerfile,.tf,.hcl,.proto,.graphql,.gql,.toml,.ini,.cfg,.conf,.env,.properties,.plist,.entitlements,.pbxproj,.xcconfig,.xcworkspacedata,.storyboard,.xib,.nib,.md,.rst,.txt,.svg,.prisma,.http,.slnx,.sln,.lock",
-    "samples": 9999
+    "samples": 9999,
+    "exclude": [
+      "*package-lock.json",
+      "*pnpm-lock.yaml",
+      "*yarn.lock",
+      "CHANGELOG.md",
+      "*/Migrations/*",
+      "numa-backend/catalog/tool-embeddings.v1.json",
+      "docs/openapi/*",
+      "docs/ALI_DEV.json",
+      "postman/*",
+      "*.svg"
+    ]
   },
   "numa-showcase": {
     "url": "https://github.com/NuMa-Menu-Srl/numa-showcase",
     "extensions": ".dart,.swift,.h,.cpp,.cc,.c,.m,.mm,.kts,.kt,.java,.xml,.yaml,.yml,.json,.sql,.mjs,.js,.ts,.tsx,.jsx,.css,.scss,.html,.py,.sh,.bash,.zsh,.rb,.go,.rs,.cs,.csproj,.cshtml,.razor,.r,.lua,.php,.pl,.ex,.exs,.erl,.hs,.scala,.groovy,.gradle,.cmake,.makefile,.dockerfile,.tf,.hcl,.proto,.graphql,.gql,.toml,.ini,.cfg,.conf,.env,.properties,.plist,.entitlements,.pbxproj,.xcconfig,.xcworkspacedata,.storyboard,.xib,.nib,.md,.rst,.txt,.svg,.prisma,.http,.slnx,.sln,.lock",
-    "samples": 9999
-  },
-  "rag-demo": {
-    "url": "https://github.com/numamenudev/rag-demo",
-    "extensions": ".dart,.swift,.h,.cpp,.cc,.c,.m,.mm,.kts,.kt,.java,.xml,.yaml,.yml,.json,.sql,.mjs,.js,.ts,.tsx,.jsx,.css,.scss,.html,.py,.sh,.bash,.zsh,.rb,.go,.rs,.cs,.csproj,.cshtml,.razor,.r,.lua,.php,.pl,.ex,.exs,.erl,.hs,.scala,.groovy,.gradle,.cmake,.makefile,.dockerfile,.tf,.hcl,.proto,.graphql,.gql,.toml,.ini,.cfg,.conf,.env,.properties,.plist,.entitlements,.pbxproj,.xcconfig,.xcworkspacedata,.storyboard,.xib,.nib,.md,.rst,.txt,.svg,.prisma,.http,.slnx,.sln,.lock",
-    "samples": 9999
-  },
-  "linkedin-b2b": {
-    "url": "https://github.com/numamenudev/linkedin-b2b",
-    "extensions": ".dart,.swift,.h,.cpp,.cc,.c,.m,.mm,.kts,.kt,.java,.xml,.yaml,.yml,.json,.sql,.mjs,.js,.ts,.tsx,.jsx,.css,.scss,.html,.py,.sh,.bash,.zsh,.rb,.go,.rs,.cs,.csproj,.cshtml,.razor,.r,.lua,.php,.pl,.ex,.exs,.erl,.hs,.scala,.groovy,.gradle,.cmake,.makefile,.dockerfile,.tf,.hcl,.proto,.graphql,.gql,.toml,.ini,.cfg,.conf,.env,.properties,.plist,.entitlements,.pbxproj,.xcconfig,.xcworkspacedata,.storyboard,.xib,.nib,.md,.rst,.txt,.svg,.prisma,.http,.slnx,.sln,.lock",
-    "samples": 9999
+    "samples": 9999,
+    "exclude": [
+      "*package-lock.json",
+      "*pnpm-lock.yaml",
+      "*yarn.lock",
+      "CHANGELOG.md",
+      "workers/worker-configuration.d.ts",
+      "migrations/meta/*",
+      "*routeTree.gen.ts",
+      "src/integrations/i18n/locales/it.json",
+      "*.svg"
+    ]
   },
   "numa-web-app": {
     "url": "https://github.com/NuMa-Menu-Srl/numa-web-app",
     "extensions": ".dart,.swift,.h,.cpp,.cc,.c,.m,.mm,.kts,.kt,.java,.xml,.yaml,.yml,.json,.sql,.mjs,.js,.ts,.tsx,.jsx,.css,.scss,.html,.py,.sh,.bash,.zsh,.rb,.go,.rs,.cs,.csproj,.cshtml,.razor,.r,.lua,.php,.pl,.ex,.exs,.erl,.hs,.scala,.groovy,.gradle,.cmake,.makefile,.dockerfile,.tf,.hcl,.proto,.graphql,.gql,.toml,.ini,.cfg,.conf,.env,.properties,.plist,.entitlements,.pbxproj,.xcconfig,.xcworkspacedata,.storyboard,.xib,.nib,.md,.rst,.txt,.svg,.prisma,.http,.slnx,.sln,.lock",
-    "samples": 9999
+    "samples": 9999,
+    "exclude": [
+      "*package-lock.json",
+      "*pnpm-lock.yaml",
+      "*yarn.lock",
+      "CHANGELOG.md",
+      "*routeTree.gen.ts",
+      "src/integrations/i18n/locales/it.json",
+      "*.svg"
+    ]
   }
 }

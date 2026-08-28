@@ -128,6 +128,11 @@ def _():
             default=".py,.js,.ts,.java,.c,.cpp,.h,.go,.rs,.rb,.md,.pyx,.cu,.rst",
             description="Comma-separated file extensions to analyze",
         )
+        exclude: str = Field(
+            default="",
+            description="Comma-separated globs of files to skip (e.g. '*.g.dart,*/Migrations/*'). "
+            "Matched against the full repo-relative path; '*' crosses directory separators.",
+        )
         version_source: str = Field(
             default="git tags", description="Version source: none, git tags, or pypi"
         )
@@ -216,6 +221,7 @@ def _(subprocess):
 @app.cell(hide_code=True)
 def _(Path, cache, datetime, hashlib, pl, subprocess):
     from concurrent.futures import ThreadPoolExecutor, as_completed
+    import fnmatch
     import re
 
     # Pre-compile regex for timestamp extraction (used in get_blame_info)
@@ -263,7 +269,10 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
 
     @cache.memoize()
     def get_tracked_files(
-        repo_path: str, commit_hash: str, extensions: list[str] | None = None
+        repo_path: str,
+        commit_hash: str,
+        extensions: list[str] | None = None,
+        exclude: tuple[str, ...] | None = None,
     ) -> list[tuple[str, str]]:
         """Get list of (file_path, blob_hash) pairs at a specific commit."""
         output = run_git_command(
@@ -278,6 +287,10 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
             meta, file_path = line.split("\t", 1)
             blob_hash = meta.split()[2]
             if extensions and not any(file_path.endswith(ext) for ext in extensions):
+                continue
+            # Generated files (l10n, migrations, lockfiles) would date every line
+            # to the moment the generator ran, not to human work.
+            if exclude and any(fnmatch.fnmatch(file_path, pat) for pat in exclude):
                 continue
             results.append((file_path, blob_hash))
         return results
@@ -333,6 +346,7 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
         commit_hash: str,
         commit_timestamp: int,
         extensions: list[str] | None,
+        exclude: tuple[str, ...] | None = None,
     ) -> list[tuple[int, int, int]]:
         """Analyze a commit, returning day-aggregated line counts.
 
@@ -343,7 +357,7 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
         """
         from collections import Counter
 
-        files = get_tracked_files(repo_path, commit_hash, extensions)
+        files = get_tracked_files(repo_path, commit_hash, extensions, exclude)
 
         # Blame files SEQUENTIALLY and fold each into the day-counter immediately.
         # The outer commit-level pool already gives 16-way parallelism; a nested
@@ -357,15 +371,15 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
         return [(commit_timestamp, day, count) for day, count in day_counts.items()]
 
 
-    def _parquet_dir_for_repo(repo_path, extensions):
+    def _parquet_dir_for_repo(repo_path, extensions, exclude=None):
         """Deterministic per-repo directory for parquet chunks.
 
-        Keyed only by (repo_path, extensions) — NOT the sampled commit set —
-        so per-commit parquets (named by immutable commit_hash) are reused
-        across runs. Extensions stay in the key because they determine which
-        files are blamed, hence the line set.
+        Keyed only by (repo_path, extensions, exclude) — NOT the sampled commit
+        set — so per-commit parquets (named by immutable commit_hash) are reused
+        across runs. Extensions and excludes stay in the key because they
+        determine which files are blamed, hence the line set.
         """
-        key = repr((str(repo_path), extensions))
+        key = repr((str(repo_path), extensions, exclude))
         run_hash = hashlib.sha256(key.encode()).hexdigest()[:12]
         out = Path("git-research") / "parquet-chunks" / run_hash
         out.mkdir(parents=True, exist_ok=True)
@@ -379,6 +393,7 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
         is_script: bool = False,
         max_workers: int = 16,
         batch: int = 0,
+        exclude: tuple[str, ...] | None = None,
     ) -> Path:
         """Collect blame data, spilling each commit to a per-day-aggregated parquet.
 
@@ -393,7 +408,7 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
         can re-invoke until 0. Commits are processed oldest-first (git log
         --reverse order), so the chart fills in chronologically.
         """
-        parquet_dir = _parquet_dir_for_repo(repo_path, extensions)
+        parquet_dir = _parquet_dir_for_repo(repo_path, extensions, exclude)
         # Empty-but-typed schema, reused for negatives (commits with 0 lines).
         empty_schema = {
             "commit_date": pl.Int64,
@@ -415,7 +430,7 @@ def _(Path, cache, datetime, hashlib, pl, subprocess):
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(
-                    analyze_single_commit, str(repo_path), h, int(d.timestamp()), extensions
+                    analyze_single_commit, str(repo_path), h, int(d.timestamp()), extensions, exclude
                 ): (h, d)
                 for h, d in pending
             }
@@ -497,6 +512,11 @@ def _(
     extensions_str = extensions_str.strip()
     extensions = [ext.strip() for ext in extensions_str.split(",")] if extensions_str else None
 
+    _exclude_str = repo_params.exclude.strip() if mo.app_meta().mode == "script" else ""
+    exclude = (
+        tuple(p.strip() for p in _exclude_str.split(",") if p.strip()) if _exclude_str else None
+    )
+
     # Get commits — pass branch ref so the cache key differs per branch
     _ref = f"origin/{_branch}" if _branch else "HEAD"
     with mo.status.spinner("Getting commit history..."):
@@ -504,11 +524,11 @@ def _(
         sampled = sample_commits(all_commits, n_samples)
 
     mo.md(f"Found **{len(all_commits)}** commits, sampling **{len(sampled)}** for analysis")
-    return extensions, repo_path, sampled
+    return exclude, extensions, repo_path, sampled
 
 
 @app.cell
-def _(collect_blame_data, extensions, mo, pl, repo_params, repo_path, sampled):
+def _(collect_blame_data, exclude, extensions, mo, pl, repo_params, repo_path, sampled):
     _batch = repo_params.batch if mo.app_meta().mode == "script" else 0
     with mo.status.progress_bar(
         total=len(sampled),
@@ -523,6 +543,7 @@ def _(collect_blame_data, extensions, mo, pl, repo_params, repo_path, sampled):
             progress_bar=bar,
             is_script=mo.app_meta().mode == "script",
             batch=_batch,
+            exclude=exclude,
         )
 
     # Read ONLY the parquets for the currently-sampled commits. The dir is now

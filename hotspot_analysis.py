@@ -5,6 +5,7 @@
 """Hotspot analysis: identify risky files using git history and LOC."""
 
 import argparse
+import fnmatch
 import hashlib
 import json
 import math
@@ -33,11 +34,24 @@ def get_cached_repo_path(repo_url: str) -> Path:
     return DOWNLOADS_DIR / f"{repo_name}-{url_hash}"
 
 
+def is_excluded(file_path: str, patterns: tuple[str, ...] | None) -> bool:
+    """True if the path matches any exclude glob.
+
+    Patterns are fnmatch-style against the full repo-relative path, so `*`
+    crosses directory separators: `*app_localizations*.dart` matches at any
+    depth and `Migrations/*` matches the whole subtree.
+    """
+    if not patterns:
+        return False
+    return any(fnmatch.fnmatch(file_path, pattern) for pattern in patterns)
+
+
 def collect_file_metrics(
     repo_path: Path,
     extensions: list[str] | None,
     ref: str = "HEAD",
     path_prefix: str = "",
+    exclude: tuple[str, ...] | None = None,
 ) -> dict[str, dict]:
     """Return per-file metrics: loc, changes, primary_author, hotspot_score."""
     ls_result = subprocess.run(
@@ -50,6 +64,8 @@ def collect_file_metrics(
     if path_prefix:
         prefix = path_prefix.rstrip("/") + "/"
         all_files = {f for f in all_files if f.startswith(prefix) or f == path_prefix.rstrip("/")}
+    if exclude:
+        all_files = {f for f in all_files if not is_excluded(f, exclude)}
 
     # One git-log pass to get author + changed files per commit.
     # \x1f prefix/suffix around author name avoids collision with any filename.
@@ -437,6 +453,7 @@ def collect_timeline_metrics(
     n_snapshots: int,
     path_prefix: str = "",
     granularity: str = "snapshot",
+    exclude: tuple[str, ...] | None = None,
 ) -> list[dict]:
     """Sample n_snapshots commits along history and collect per-file metrics at each.
 
@@ -550,6 +567,8 @@ def collect_timeline_metrics(
                 pfx = path_prefix.rstrip("/") + "/"
                 if not (fname.startswith(pfx) or fname == path_prefix.rstrip("/")):
                     continue
+            if is_excluded(fname, exclude):
+                continue
             files_in_tree[fname] = size
 
         changes_counter, authors_counter = snapshots_state.get(sha, (Counter(), {}))
@@ -620,6 +639,12 @@ def main() -> None:
     parser.add_argument("--branch", default="", help="Branch to analyze (default: HEAD)")
     parser.add_argument("--branch-label", default="", help="Label for output file (default: same as branch)")
     parser.add_argument("--path-prefix", default="", help="Only analyze files under this path prefix (e.g. 'src/core/')")
+    parser.add_argument(
+        "--exclude",
+        default="",
+        help="Comma-separated globs of files to skip (e.g. '*.g.dart,*/Migrations/*'). "
+        "Matched against the full repo-relative path; '*' crosses directory separators.",
+    )
     parser.add_argument("--timeline", type=int, default=0, help="Also generate N timeline snapshots (0 = disabled)")
     parser.add_argument(
         "--timeline-granularity", default="snapshot",
@@ -653,10 +678,15 @@ def main() -> None:
     extensions_str = args.file_extensions.strip()
     extensions = [e.strip() for e in extensions_str.split(",")] if extensions_str else None
 
+    exclude_str = args.exclude.strip()
+    exclude = tuple(p.strip() for p in exclude_str.split(",") if p.strip()) if exclude_str else None
+
     scope_note = f" (scope: {args.path_prefix})" if args.path_prefix else ""
     print(f"  Collecting file metrics for {repo_name}{suffix}{scope_note}...")
     stage("snapshot", 5)
-    metrics = collect_file_metrics(repo_path, extensions, ref, path_prefix=args.path_prefix)
+    metrics = collect_file_metrics(
+        repo_path, extensions, ref, path_prefix=args.path_prefix, exclude=exclude
+    )
     print(f"  Analyzed {len(metrics)} files")
 
     nodes = build_tree_nodes(metrics)
@@ -682,7 +712,7 @@ def main() -> None:
         stage("timeline", max(1, guess) * 3)
         snapshots = collect_timeline_metrics(
             repo_path, extensions, ref, args.timeline, path_prefix=args.path_prefix,
-            granularity=tl_granularity,
+            granularity=tl_granularity, exclude=exclude,
         )
         timeline_path = Path("charts") / f"{repo_name}{suffix}-timeline.json"
         timeline_path.write_text(

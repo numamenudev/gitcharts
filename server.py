@@ -95,6 +95,8 @@ def run_hotspot(repo_name, config, branch="", save_as="", path_prefix="", timeli
         "--repo", config["url"],
         "--file-extensions", config.get("extensions", ".py,.js,.ts,.java,.c,.cpp,.h,.go,.rs"),
     ]
+    if config.get("exclude"):
+        cmd += ["--exclude", ",".join(config["exclude"])]
     if branch:
         cmd += ["--branch", branch]
         if save_as and save_as != branch:
@@ -143,6 +145,8 @@ def regenerate_repo(repo_name, config, granularity, branch="", save_as=""):
         "--granularity", granularity,
         "--batch", str(ARCHAEOLOGY_BATCH),
     ]
+    if config.get("exclude"):
+        base_cmd += ["--exclude", ",".join(config["exclude"])]
     if branch:
         base_cmd += ["--branch", branch]
         if save_as and save_as != branch:
